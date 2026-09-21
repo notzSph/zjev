@@ -7,7 +7,7 @@ import json
 import os
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
-from packages.contracts import InputError, validate_request
+from packages.core.contracts import InputError, validate_request
 
 DEFAULT_BASE_URL = "https://api.typesafe.ai"
 
