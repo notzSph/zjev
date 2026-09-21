@@ -26,7 +26,7 @@ jobs:
         run: python -m pip install -r infra/requirements.txt
 
       - name: Run tests
-        run: python -m unittest tests.unit.test_job_eval tests.integration.test_jev_client -v
+        run: python -m unittest tests.unit.test_job_fit tests.unit.test_job_fit_policy tests.integration.test_jev_client -v
 
       - name: Compile Python modules
         run: python -m compileall -q apps packages tests

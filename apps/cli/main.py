@@ -15,7 +15,8 @@ VENDOR = ROOT / ".vendor"
 if VENDOR.is_dir() and str(VENDOR) not in sys.path:
     sys.path.insert(0, str(VENDOR))
 
-from packages.jev_client import InputError, evaluate  # noqa: E402
+from packages.core.contracts import InputError  # noqa: E402
+from packages.integrations.typesafe import evaluate  # noqa: E402
 
 
 def main() -> int:

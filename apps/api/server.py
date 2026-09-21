@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal HTTP API for Jev evaluations.
 
-This is intentionally small: one health endpoint and one evaluation endpoint.
+This is intentionally small: one health endpoint and two evaluation endpoints.
 The application owns HTTP concerns; the Jev client owns TypeSafe concerns.
 """
 
@@ -20,8 +20,9 @@ VENDOR = ROOT / ".vendor"
 if VENDOR.is_dir() and str(VENDOR) not in sys.path:
     sys.path.insert(0, str(VENDOR))
 
-from packages.contracts import InputError  # noqa: E402
-from packages.jev_client import evaluate  # noqa: E402
+from packages.core.contracts import InputError  # noqa: E402
+from packages.job_fit import build_job_fit_request, derive_job_fit_policy  # noqa: E402
+from packages.integrations.typesafe import evaluate  # noqa: E402
 
 MAX_BODY_BYTES = 1_000_000
 
@@ -42,7 +43,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/v1/evaluate":
+        if self.path not in {"/v1/evaluate", "/v1/job_fit"}:
             self._json(404, {"error": "not_found"})
             return
         try:
@@ -50,9 +51,17 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             if length <= 0 or length > MAX_BODY_BYTES:
                 raise InputError("request body must be between 1 byte and 1 MB")
             payload = json.loads(self.rfile.read(length))
-            result = evaluate(payload)
+            if self.path == "/v1/job_fit":
+                result = evaluate(build_job_fit_request(
+                    payload.get("cv"),
+                    payload.get("job_description"),
+                    payload.get("model", "jev-latest"),
+                ))
+                result["policy"] = derive_job_fit_policy(result)
+            else:
+                result = evaluate(payload)
             self._json(200, result)
-        except (InputError, json.JSONDecodeError) as error:
+        except (InputError, ValueError, json.JSONDecodeError) as error:
             self._json(400, {"error": str(error)})
         except RuntimeError as error:
             self._json(502, {"error": str(error)})
