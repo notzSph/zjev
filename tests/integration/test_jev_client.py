@@ -10,7 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / ".vendor"))
-from packages.jev_client import client as module
+from packages.integrations.typesafe import client as module
 
 SDK_AVAILABLE = importlib.util.find_spec("typesafe_sdk") is not None
 
