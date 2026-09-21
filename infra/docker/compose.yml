@@ -1,0 +1,27 @@
+name: zjev
+
+services:
+  jev-api:
+    env_file:
+      - ../env/.env
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    command: ["python", "apps/api/server.py"]
+    environment:
+      TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
+      JEV_API_HOST: 0.0.0.0
+      JEV_API_PORT: 8080
+    ports:
+      - "${JEV_API_PORT:-8787}:8080"
+
+  jev-cli:
+    env_file:
+      - ../env/.env
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    environment:
+      TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
+    stdin_open: true
+    tty: true
