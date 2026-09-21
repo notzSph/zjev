@@ -1,3 +1,5 @@
-from .job_eval import build_job_eval_request
+"""Generic evaluation definitions.
 
-__all__ = ["build_job_eval_request"]
+Domain-specific evaluators live in their own package, such as
+``packages.job_eval``.
+"""

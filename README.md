@@ -68,9 +68,13 @@ curl -X POST http://localhost:8787/v1/job_eval \
   --data '{"cv":"...","job_description":"..."}'
 ```
 
-The job evaluator returns typed fit dimensions, application strategy,
-evidence-gap and overclaim-risk signals. It judges only the supplied CV and
-job text.
+The job evaluator returns independent typed dimensions for requirements,
+technical work, architecture, leadership, delivery, governance, seniority,
+and evidence quality. It also returns application strategy, positioning,
+evidence-gap, seniority-mismatch, tailoring, and overclaim-risk signals.
+The API adds a deterministic `policy` block that calculates a weighted fit,
+confidence band, and conservative next action. Raw Jev answers remain intact
+for auditability. It judges only the supplied CV and job text.
 
 The compose service passes `JEV_API_KEY`, `TYPESAFE_API_KEY`, and the optional
 `TYPESAFE_API_BASE_URL` into the container. Keep the actual key outside the
