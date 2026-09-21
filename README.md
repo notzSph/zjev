@@ -6,6 +6,10 @@
 [![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](https://en.wikipedia.org/wiki/Software_release_life_cycle)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+CI runs on pushes and pull requests. Tagged releases build and publish the
+Docker image to GitHub Container Registry. Host deployment remains an explicit
+Compose operation until the target host and deployment secrets are defined.
+
 This is a narrow TypeSafe bridge. It leaves OpenClaw configuration
 untouched and exposes all documented basic primitives through one JSON-in/JSON-
 out command.
@@ -37,7 +41,7 @@ keeping local verification dependency-free.
 ## Docker Compose
 
 Compose wraps the existing CLI and the first real API surface. The API has one
-health endpoint and one evaluation endpoint. No background workers are added.
+health endpoint and two evaluation endpoints. No background workers are added.
 
 ```bash
 export JEV_API_KEY='...'
@@ -56,9 +60,33 @@ curl -X POST http://localhost:8787/v1/evaluate \
   --data @examples/basic_request.json
 ```
 
+Run the job evaluator against a CV and job description:
+
+```bash
+curl -X POST http://localhost:8787/v1/job_eval \
+  -H 'Content-Type: application/json' \
+  --data '{"cv":"...","job_description":"..."}'
+```
+
+The job evaluator returns typed fit dimensions, application strategy,
+evidence-gap and overclaim-risk signals. It judges only the supplied CV and
+job text.
+
 The compose service passes `JEV_API_KEY`, `TYPESAFE_API_KEY`, and the optional
 `TYPESAFE_API_BASE_URL` into the container. Keep the actual key outside the
 repo.
+
+## Pipeline
+
+Run the release pipeline by pushing a version tag:
+
+```bash
+git tag v0.0.2-alpha
+git push origin v0.0.2-alpha
+```
+
+GitHub Actions will publish `ghcr.io/<owner>/zjev`. The image does not contain
+runtime secrets.
 
 ## Covered behavior
 
