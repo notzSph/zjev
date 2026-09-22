@@ -27,6 +27,10 @@ export JEV_API_KEY='...'
 python3 apps/cli/main.py < examples/basic_request.json
 ```
 
+For the API, set `JEV_API_TOKEN` and send `Authorization: Bearer <token>`.
+Production mode (`JEV_ENV=production`) refuses to start without that token.
+Every API response includes a request ID for tracing.
+
 Get the key from the TypeSafe dashboard. Do not put it in source, prompts,
 Discord, or the request body. `TYPESAFE_API_KEY` is also accepted for
 upstream-compatible deployments.

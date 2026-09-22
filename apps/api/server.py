@@ -8,6 +8,7 @@ The application owns HTTP concerns; the Jev client owns TypeSafe concerns.
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import sys
 import uuid
@@ -40,7 +41,19 @@ MAX_BODY_BYTES = 1_000_000
 
 
 class JevAPIHandler(BaseHTTPRequestHandler):
+    def _request_id(self) -> str:
+        return self.headers.get("X-Request-ID", str(uuid.uuid4()))[:128]
+
+    def _authorized(self) -> bool:
+        expected = os.environ.get("JEV_API_TOKEN")
+        if not expected:
+            return os.environ.get("JEV_ENV", "development").lower() != "production"
+        authorization = self.headers.get("Authorization", "")
+        supplied = authorization.removeprefix("Bearer ").strip()
+        return bool(supplied) and hmac.compare_digest(supplied, expected)
+
     def _json(self, status: int, payload: dict) -> None:
+        payload = {"request_id": self._request_id(), **payload}
         encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -55,6 +68,9 @@ class JevAPIHandler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._authorized():
+            self._json(401, {"error": "unauthorized"})
+            return
         if self.path not in {
             "/v1/evaluate", "/v1/job_fit", "/v1/outreach/evaluate",
             "/v1/outreach/target-plan", "/v1/outreach/targets/validate",
@@ -170,6 +186,8 @@ class JevAPIHandler(BaseHTTPRequestHandler):
 def main() -> None:
     host = os.environ.get("JEV_API_HOST", "0.0.0.0")
     port = int(os.environ.get("JEV_API_PORT", "8080"))
+    if os.environ.get("JEV_ENV", "development").lower() == "production" and not os.environ.get("JEV_API_TOKEN"):
+        raise RuntimeError("JEV_API_TOKEN is required in production")
     server = ThreadingHTTPServer((host, port), JevAPIHandler)
     print(f"Jev API listening on {host}:{port}", flush=True)
     try:
