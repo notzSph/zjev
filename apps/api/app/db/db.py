@@ -125,6 +125,23 @@ class SQLAlchemyAuditStore:
             job.started_at = now
         return self.get_job(job_id)
 
+    def claim_next_job(self) -> dict[str, Any] | None:
+        now = datetime.now(timezone.utc)
+        with self.sessions.begin() as session:
+            job = session.scalar(
+                select(OutreachJob)
+                .where(OutreachJob.status == "queued", OutreachJob.available_at <= now)
+                .order_by(OutreachJob.available_at, OutreachJob.created_at)
+                .with_for_update(skip_locked=True)
+            )
+            if job is None:
+                return None
+            job.status = "running"
+            job.attempts += 1
+            job.started_at = now
+            job_id = job.job_id
+        return self.get_job(job_id)
+
     def complete_job(self, job_id: str, result: dict[str, Any]) -> None:
         with self.sessions.begin() as session:
             job = session.get(OutreachJob, job_id)

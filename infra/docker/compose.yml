@@ -33,6 +33,20 @@ services:
     ports:
       - "${JEV_API_PORT:-8787}:8080"
 
+  jev-worker:
+    env_file:
+      - ../env/.env
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    command: ["sh", "-c", "PYTHONPATH=apps/api python -m app.workers.outreach"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
+      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:5432/jevzoo}
+
   jev-cli:
     env_file:
       - ../env/.env

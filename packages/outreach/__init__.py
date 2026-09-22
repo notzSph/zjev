@@ -9,6 +9,7 @@ from .ranking import rank_scores, ranked_csv
 from .sources import SourceNotConfigured, search_google_places, source_status
 from .jobs import process_job
 from .zcrm import ZCRMClient, ZCRMNotConfigured, export_scores_to_zcrm, score_to_zcrm_lead
+from .jobs import execute_claimed_job
 
 __all__ = [
     "build_outreach_request",
@@ -30,4 +31,5 @@ __all__ = [
     "ZCRMNotConfigured",
     "export_scores_to_zcrm",
     "score_to_zcrm_lead",
+    "execute_claimed_job",
 ]

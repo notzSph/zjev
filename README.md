@@ -161,6 +161,11 @@ background worker. Failed jobs retry with exponential backoff and move to
 `dead_letter` after `max_attempts`. Poll `GET /v1/outreach/score/jobs/{job_id}`
 for the result.
 
+Production Compose also includes a separate `jev-worker` service. It claims
+queued jobs directly from Postgres, so API restarts do not own or lose queued
+work. Outbound zCRM requests can use the process-local limiter to fail fast and
+let the durable job retry policy handle backoff.
+
 Record what happened after review/contact:
 
 ```bash

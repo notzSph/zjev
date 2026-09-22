@@ -9,6 +9,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .ratelimit import OutboundRateLimiter
+
 
 class ZCRMNotConfigured(RuntimeError):
     pass
@@ -24,6 +26,7 @@ class ZCRMClient:
     api_token: str
     business_id: str
     opener: Callable[..., Any] = urllib.request.urlopen
+    limiter: OutboundRateLimiter | None = None
 
     @classmethod
     def from_env(cls, opener: Callable[..., Any] = urllib.request.urlopen) -> "ZCRMClient":
@@ -41,6 +44,8 @@ class ZCRMClient:
     def upsert_leads(self, leads: list[dict[str, Any]]) -> dict[str, Any]:
         if not leads:
             raise ValueError("leads must not be empty")
+        if self.limiter is not None:
+            self.limiter.acquire("zcrm")
         request = urllib.request.Request(
             f"{self.base_url.rstrip('/')}/api/v1/agent/outreach/leads",
             data=json.dumps({"leads": leads}).encode(),

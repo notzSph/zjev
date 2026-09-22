@@ -24,6 +24,7 @@ from packages.outreach import (
 )
 
 from ...deps import AuthDependency, get_audit_store
+from ....services.outreach import score_batch
 from ..schemas.outreach import (
     CalibrationRequest,
     GooglePlacesRequest,
@@ -41,28 +42,6 @@ from ..schemas.outreach import (
 
 router = APIRouter(prefix="/v1/outreach", tags=["outreach"])
 AuditStore = Annotated[Any, Depends(get_audit_store)]
-
-
-def _score_batch(payload: dict[str, Any], store: Any) -> dict[str, Any]:
-    candidates = validate_target_batch(payload["candidates"])
-    run_id = payload["run_id"]
-    cached = store.get_run(run_id)
-    if cached is not None and cached:
-        return {**cached, "idempotent_replay": True}
-    store.create_run(run_id)
-    scores = score_target_batch(
-        candidates, payload["offer"], payload["proof_assets"], evaluate, store, run_id
-    )
-    ranked = rank_scores(scores)
-    result = {
-        "run_id": run_id,
-        "count": len(ranked),
-        "scores": ranked,
-        "csv": ranked_csv(ranked),
-        "idempotent_replay": False,
-    }
-    store.save_run(run_id, result)
-    return result
 
 
 @router.post("/evaluate")
@@ -146,7 +125,7 @@ def score_google_businesses(
 @router.post("/score")
 def score(payload: ScoreBatchRequest, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
     run_id = payload.run_id or str(uuid.uuid4())
-    return _score_batch({**payload.model_dump(), "run_id": run_id}, store)
+    return score_batch({**payload.model_dump(), "run_id": run_id}, store)
 
 
 @router.post("/score/jobs", status_code=status.HTTP_202_ACCEPTED)
@@ -164,7 +143,7 @@ def enqueue_score_job(
             process_job,
             store,
             job_id,
-            lambda data: _score_batch(data, store),
+            lambda data: score_batch(data, store),
         )
     return {
         "job_id": job_id,
