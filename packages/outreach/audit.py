@@ -273,6 +273,15 @@ class OutreachAuditStore:
                 return None
         return self.get_job(job_id)
 
+    def claim_next_job(self) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT job_id FROM outreach_jobs WHERE status = 'queued' AND available_at <= ? "
+                "ORDER BY available_at, created_at LIMIT 1",
+                (datetime.now(timezone.utc).isoformat(),),
+            ).fetchone()
+        return self.claim_job(row["job_id"]) if row else None
+
     def complete_job(self, job_id: str, result: dict[str, Any]) -> None:
         with self._connect() as connection:
             connection.execute(
