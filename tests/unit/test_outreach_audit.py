@@ -86,6 +86,13 @@ class OutreachAuditTests(unittest.TestCase):
         self.assertEqual(completed["status"], "succeeded")
         self.assertEqual(completed["result"], {"ok": True})
 
+    def test_human_approval_queue(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        self.assertEqual(len(store.pending_approvals()), 1)
+        store.approve_score(result[0]["audit_id"], "approved", "Reviewed evidence")
+        self.assertEqual(store.pending_approvals(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

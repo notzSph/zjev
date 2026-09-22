@@ -9,6 +9,7 @@ from sqlalchemy import and_, create_engine, delete, func, select
 from sqlalchemy.orm import sessionmaker
 
 from packages.outreach.audit import POSITIVE_OUTCOMES
+from packages.outreach.metrics import classification_metrics, drift_report
 from .models.base import Base
 from .models import OutreachJob, OutreachRun, OutreachScore
 from .session import create_engine_from_url
@@ -173,6 +174,43 @@ class SQLAlchemyAuditStore:
             score.outcome_note = note.strip() if note else None
             score.outcome_at = datetime.now(timezone.utc)
 
+    def approve_score(self, audit_id: int, decision: str, note: str | None = None) -> None:
+        if decision not in {"approved", "rejected", "needs_changes"}:
+            raise ValueError("decision must be approved, rejected, or needs_changes")
+        if note is not None and not note.strip():
+            raise ValueError("approval note must be non-empty when supplied")
+        with self.sessions.begin() as session:
+            score = session.get(OutreachScore, audit_id)
+            if score is None:
+                raise ValueError("audit_id was not found")
+            score.approval_status = decision
+            score.approval_note = note.strip() if note else None
+            score.approved_at = datetime.now(timezone.utc)
+
+    def pending_approvals(self, limit: int = 100) -> list[dict[str, Any]]:
+        if not isinstance(limit, int) or not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        with self.sessions() as session:
+            rows = session.execute(
+                select(
+                    OutreachScore.id, OutreachScore.candidate_id,
+                    OutreachScore.recommended_action, OutreachScore.confidence_band,
+                    OutreachScore.result, OutreachScore.created_at,
+                ).where(OutreachScore.approval_status == "pending")
+                .order_by(OutreachScore.created_at).limit(limit)
+            ).all()
+        return [
+            {
+                "audit_id": audit_id,
+                "candidate_id": candidate_id,
+                "recommended_action": action,
+                "confidence_band": confidence_band,
+                "result": result,
+                "created_at": created_at,
+            }
+            for audit_id, candidate_id, action, confidence_band, result, created_at in rows
+        ]
+
     def metrics(self) -> dict[str, Any]:
         with self.sessions() as session:
             total = session.scalar(select(func.count()).select_from(OutreachScore)) or 0
@@ -201,13 +239,39 @@ class SQLAlchemyAuditStore:
 
     def calibration_report(self, minimum_labeled: int = 30) -> dict[str, Any]:
         with self.sessions() as session:
-            rows = session.execute(select(OutreachScore.recommended_action, OutreachScore.outcome, func.count()).where(OutreachScore.outcome.is_not(None)).group_by(OutreachScore.recommended_action, OutreachScore.outcome)).all()
-        groups: dict[str, dict[str, int]] = {}
-        for action, outcome, count in rows:
-            groups.setdefault(action, {})[outcome] = count
-        by_action = {}
-        for action, counts in groups.items():
-            labeled = sum(counts.values())
-            positive = sum(count for outcome, count in counts.items() if outcome in POSITIVE_OUTCOMES)
-            by_action[action] = {"labeled": labeled, "positive": positive, "positive_rate": round(positive / labeled, 4), "status": "ready" if labeled >= minimum_labeled else "insufficient_data", "outcomes": counts}
-        return {"minimum_labeled": minimum_labeled, "by_action": by_action, "threshold_tuning_allowed": all(item["status"] == "ready" for item in by_action.values()) and bool(by_action)}
+            rows = session.execute(
+                select(OutreachScore.recommended_action, OutreachScore.outcome)
+                .where(OutreachScore.outcome.is_not(None))
+            ).all()
+        report = classification_metrics(
+            [{"action": action, "outcome": outcome} for action, outcome in rows],
+            minimum_labeled,
+        )
+        return {
+            "minimum_labeled": minimum_labeled,
+            **report,
+            "threshold_tuning_allowed": report["status"] == "ready",
+        }
+
+    def drift_report(self, recent_days: int = 7) -> dict[str, Any]:
+        with self.sessions() as session:
+            rows = session.execute(
+                select(
+                    OutreachScore.recommended_action,
+                    OutreachScore.confidence_band,
+                    OutreachScore.policy,
+                    OutreachScore.created_at,
+                )
+            ).all()
+        return drift_report(
+            [
+                {
+                    "action": action,
+                    "confidence_band": confidence_band or "unknown",
+                    "policy": policy,
+                    "created_at": created_at,
+                }
+                for action, confidence_band, policy, created_at in rows
+            ],
+            recent_days,
+        )

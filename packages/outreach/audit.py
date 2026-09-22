@@ -105,6 +105,12 @@ class OutreachAuditStore:
                 connection.execute("ALTER TABLE outreach_scores ADD COLUMN outcome_note TEXT")
             if "outcome_at" not in columns:
                 connection.execute("ALTER TABLE outreach_scores ADD COLUMN outcome_at TEXT")
+            if "approval_status" not in columns:
+                connection.execute("ALTER TABLE outreach_scores ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'pending'")
+            if "approval_note" not in columns:
+                connection.execute("ALTER TABLE outreach_scores ADD COLUMN approval_note TEXT")
+            if "approved_at" not in columns:
+                connection.execute("ALTER TABLE outreach_scores ADD COLUMN approved_at TEXT")
 
     def record(
         self, candidate: dict[str, Any], result: dict[str, Any], run_id: str | None = None
@@ -148,6 +154,40 @@ class OutreachAuditStore:
             )
             if cursor.rowcount != 1:
                 raise ValueError("audit_id was not found")
+
+    def approve_score(self, audit_id: int, decision: str, note: str | None = None) -> None:
+        if decision not in {"approved", "rejected", "needs_changes"}:
+            raise ValueError("decision must be approved, rejected, or needs_changes")
+        if note is not None and not note.strip():
+            raise ValueError("approval note must be non-empty when supplied")
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "UPDATE outreach_scores SET approval_status = ?, approval_note = ?, approved_at = ? WHERE id = ?",
+                (decision, note.strip() if note else None, datetime.now(timezone.utc).isoformat(), audit_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("audit_id was not found")
+
+    def pending_approvals(self, limit: int = 100) -> list[dict[str, Any]]:
+        if not isinstance(limit, int) or not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id, candidate_id, recommended_action, confidence_band, result_json, created_at "
+                "FROM outreach_scores WHERE approval_status = 'pending' ORDER BY created_at LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                "audit_id": row["id"],
+                "candidate_id": row["candidate_id"],
+                "recommended_action": row["recommended_action"],
+                "confidence_band": row["confidence_band"],
+                "result": json.loads(row["result_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
 
     def metrics(self) -> dict[str, Any]:
         with self._connect() as connection:
@@ -199,27 +239,37 @@ class OutreachAuditStore:
                 "FROM outreach_scores WHERE outcome IS NOT NULL "
                 "GROUP BY recommended_action, outcome"
             ).fetchall()
-        groups: dict[str, dict[str, int]] = {}
-        for row in rows:
-            groups.setdefault(row["recommended_action"], {})[row["outcome"]] = row["count"]
-        by_action = {}
-        for action, counts in groups.items():
-            labeled = sum(counts.values())
-            positive = sum(count for outcome, count in counts.items() if outcome in POSITIVE_OUTCOMES)
-            by_action[action] = {
-                "labeled": labeled,
-                "positive": positive,
-                "positive_rate": round(positive / labeled, 4) if labeled else None,
-                "status": "ready" if labeled >= minimum_labeled else "insufficient_data",
-                "outcomes": counts,
-            }
+        from .metrics import classification_metrics
+
+        labeled = [
+            {"action": row["recommended_action"], "outcome": row["outcome"]}
+            for row in rows
+        ]
+        report = classification_metrics(labeled, minimum_labeled)
         return {
             "minimum_labeled": minimum_labeled,
-            "by_action": by_action,
-            "threshold_tuning_allowed": all(
-                item["status"] == "ready" for item in by_action.values()
-            ) and bool(by_action),
+            **report,
+            "threshold_tuning_allowed": report["status"] == "ready",
         }
+
+    def drift_report(self, recent_days: int = 7) -> dict[str, Any]:
+        from .metrics import drift_report
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT recommended_action, confidence_band, policy_json, created_at "
+                "FROM outreach_scores"
+            ).fetchall()
+        normalized = [
+            {
+                "action": row["recommended_action"],
+                "confidence_band": row["confidence_band"] or "unknown",
+                "policy": json.loads(row["policy_json"]),
+                "created_at": datetime.fromisoformat(row["created_at"]),
+            }
+            for row in rows
+        ]
+        return drift_report(normalized, recent_days)
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         if not isinstance(run_id, str) or not run_id.strip():

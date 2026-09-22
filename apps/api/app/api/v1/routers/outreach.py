@@ -27,6 +27,10 @@ from ...deps import AuthDependency, get_audit_store
 from ....services.outreach import score_batch
 from ..schemas.outreach import (
     CalibrationRequest,
+    ApprovalQueueRequest,
+    ApprovalRequest,
+    DriftRequest,
+    DashboardRequest,
     GooglePlacesRequest,
     GooglePlacesScoreRequest,
     OutcomeRequest,
@@ -174,6 +178,20 @@ def outcome(payload: OutcomeRequest, _: AuthDependency, store: AuditStore) -> di
     return {"updated": True}
 
 
+@router.post("/approvals")
+def approval(payload: ApprovalRequest, _: AuthDependency, store: AuditStore) -> dict[str, bool]:
+    store.approve_score(payload.audit_id, payload.decision, payload.note)
+    return {"updated": True}
+
+
+@router.post("/approvals/pending")
+def pending_approvals(
+    payload: ApprovalQueueRequest, _: AuthDependency, store: AuditStore
+) -> dict[str, Any]:
+    items = store.pending_approvals(payload.limit)
+    return {"count": len(items), "items": items}
+
+
 @router.post("/metrics")
 def metrics(_: AuthDependency, store: AuditStore) -> dict[str, Any]:
     return store.metrics()
@@ -182,3 +200,22 @@ def metrics(_: AuthDependency, store: AuditStore) -> dict[str, Any]:
 @router.post("/calibration")
 def calibration(payload: CalibrationRequest, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
     return store.calibration_report(payload.minimum_labeled)
+
+
+@router.post("/drift")
+def drift(payload: DriftRequest, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
+    if not 1 <= payload.recent_days <= 90:
+        raise ValueError("recent_days must be between 1 and 90")
+    return store.drift_report(payload.recent_days)
+
+
+@router.post("/dashboard")
+def dashboard(payload: DashboardRequest, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
+    if not 1 <= payload.recent_days <= 90:
+        raise ValueError("recent_days must be between 1 and 90")
+    return {
+        "metrics": store.metrics(),
+        "calibration": store.calibration_report(payload.minimum_labeled),
+        "drift": store.drift_report(payload.recent_days),
+        "pending_approvals": store.pending_approvals(100),
+    }

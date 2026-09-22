@@ -51,7 +51,26 @@ class OutcomeRequest(StrictModel):
     note: str | None = None
 
 
+class ApprovalRequest(StrictModel):
+    audit_id: int
+    decision: str
+    note: str | None = None
+
+
+class ApprovalQueueRequest(StrictModel):
+    limit: int = 100
+
+
 class CalibrationRequest(StrictModel):
+    minimum_labeled: int = 30
+
+
+class DriftRequest(StrictModel):
+    recent_days: int = 7
+
+
+class DashboardRequest(StrictModel):
+    recent_days: int = 7
     minimum_labeled: int = 30
 
 

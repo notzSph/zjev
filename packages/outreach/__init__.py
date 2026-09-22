@@ -10,6 +10,7 @@ from .sources import SourceNotConfigured, search_google_places, source_status
 from .jobs import process_job
 from .zcrm import ZCRMClient, ZCRMNotConfigured, export_scores_to_zcrm, score_to_zcrm_lead
 from .jobs import execute_claimed_job
+from .metrics import classification_metrics, drift_report
 
 __all__ = [
     "build_outreach_request",
@@ -32,4 +33,6 @@ __all__ = [
     "export_scores_to_zcrm",
     "score_to_zcrm_lead",
     "execute_claimed_job",
+    "classification_metrics",
+    "drift_report",
 ]

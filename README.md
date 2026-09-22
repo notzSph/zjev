@@ -171,6 +171,12 @@ terminal jobs. Set `JEV_ALLOWED_SOURCE_TYPES` to a comma-separated allowlist,
 such as `google_places,csv,zcrm,manual`; unapproved source types are rejected
 before scoring. The worker runs retention cleanup on startup.
 
+Calibration is exposed at `POST /v1/outreach/calibration`, drift metrics at
+`POST /v1/outreach/drift`, and the combined dashboard payload at
+`POST /v1/outreach/dashboard`. Human review uses
+`POST /v1/outreach/approvals/pending` and `POST /v1/outreach/approvals` with
+`approved`, `rejected`, or `needs_changes` decisions.
+
 Record what happened after review/contact:
 
 ```bash
