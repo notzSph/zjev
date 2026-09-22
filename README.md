@@ -166,6 +166,11 @@ queued jobs directly from Postgres, so API restarts do not own or lose queued
 work. Outbound zCRM requests can use the process-local limiter to fail fast and
 let the durable job retry policy handle backoff.
 
+Set `JEV_OUTREACH_RETENTION_DAYS` to control cleanup of old scores, runs, and
+terminal jobs. Set `JEV_ALLOWED_SOURCE_TYPES` to a comma-separated allowlist,
+such as `google_places,csv,zcrm,manual`; unapproved source types are rejected
+before scoring. The worker runs retention cleanup on startup.
+
 Record what happened after review/contact:
 
 ```bash

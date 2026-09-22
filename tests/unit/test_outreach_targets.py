@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from packages.outreach import validate_target_batch
 
@@ -39,6 +40,11 @@ class TargetBatchTests(unittest.TestCase):
         }]
         result = validate_target_batch([candidate])[0]
         self.assertEqual(result["source_records"][0]["captured_at"], "2026-09-22T08:00:00+00:00")
+
+    def test_rejects_unapproved_source_types(self):
+        with patch.dict("os.environ", {"JEV_ALLOWED_SOURCE_TYPES": "google_places"}):
+            with self.assertRaises(ValueError):
+                validate_target_batch([_candidate()])
 
 
 if __name__ == "__main__":

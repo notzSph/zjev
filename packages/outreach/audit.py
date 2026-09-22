@@ -173,6 +173,23 @@ class OutreachAuditStore:
             "calibration": self.calibration_report(),
         }
 
+    def purge_expired(self, retention_days: int) -> dict[str, int]:
+        if not isinstance(retention_days, int) or not 1 <= retention_days <= 3650:
+            raise ValueError("retention_days must be between 1 and 3650")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).isoformat()
+        with self._connect() as connection:
+            scores = connection.execute(
+                "DELETE FROM outreach_scores WHERE created_at < ?", (cutoff,)
+            ).rowcount
+            runs = connection.execute(
+                "DELETE FROM outreach_runs WHERE created_at < ?", (cutoff,)
+            ).rowcount
+            jobs = connection.execute(
+                "DELETE FROM outreach_jobs WHERE created_at < ? "
+                "AND status IN ('succeeded', 'dead_letter')", (cutoff,)
+            ).rowcount
+        return {"scores": scores, "runs": runs, "jobs": jobs}
+
     def calibration_report(self, minimum_labeled: int = 30) -> dict[str, Any]:
         if not isinstance(minimum_labeled, int) or minimum_labeled < 1:
             raise ValueError("minimum_labeled must be a positive integer")

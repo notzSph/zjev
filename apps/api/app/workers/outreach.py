@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Any
 
@@ -31,7 +30,9 @@ def main() -> None:
     settings = APISettings.from_env()
     if not settings.database_url:
         raise RuntimeError("JEV_DATABASE_URL is required for the outreach worker")
-    run_forever(SQLAlchemyAuditStore(settings.database_url))
+    store = SQLAlchemyAuditStore(settings.database_url)
+    store.purge_expired(settings.retention_days)
+    run_forever(store)
 
 
 if __name__ == "__main__":

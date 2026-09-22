@@ -15,6 +15,7 @@ class APISettings:
     database_url: str | None
     audit_db_path: str
     google_maps_api_key: str | None
+    retention_days: int = 365
 
     @classmethod
     def from_env(cls) -> "APISettings":
@@ -26,6 +27,7 @@ class APISettings:
             database_url=os.environ.get("JEV_DATABASE_URL"),
             audit_db_path=os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3"),
             google_maps_api_key=os.environ.get("GOOGLE_MAPS_API_KEY"),
+            retention_days=int(os.environ.get("JEV_OUTREACH_RETENTION_DAYS", "365")),
         )
 
     def validate(self) -> None:
@@ -35,3 +37,5 @@ class APISettings:
             raise RuntimeError("JEV_DATABASE_URL is required in production")
         if not 1 <= self.port <= 65535:
             raise RuntimeError("JEV_API_PORT must be between 1 and 65535")
+        if not 1 <= self.retention_days <= 3650:
+            raise RuntimeError("JEV_OUTREACH_RETENTION_DAYS must be between 1 and 3650")

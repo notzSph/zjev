@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import and_, create_engine, func, select
+from sqlalchemy import and_, create_engine, delete, func, select
 from sqlalchemy.orm import sessionmaker
 
 from packages.outreach.audit import POSITIVE_OUTCOMES
@@ -179,6 +179,25 @@ class SQLAlchemyAuditStore:
             rows = session.execute(select(OutreachScore.recommended_action, func.count()).group_by(OutreachScore.recommended_action)).all()
             outcomes = session.execute(select(OutreachScore.outcome, func.count()).where(OutreachScore.outcome.is_not(None)).group_by(OutreachScore.outcome)).all()
         return {"total_scores": total, "actions": dict(rows), "outcomes": dict(outcomes)}
+
+    def purge_expired(self, retention_days: int) -> dict[str, int]:
+        if not isinstance(retention_days, int) or not 1 <= retention_days <= 3650:
+            raise ValueError("retention_days must be between 1 and 3650")
+        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        with self.sessions.begin() as session:
+            scores = session.execute(
+                delete(OutreachScore).where(OutreachScore.created_at < cutoff)
+            ).rowcount or 0
+            runs = session.execute(
+                delete(OutreachRun).where(OutreachRun.created_at < cutoff)
+            ).rowcount or 0
+            jobs = session.execute(
+                delete(OutreachJob).where(
+                    OutreachJob.created_at < cutoff,
+                    OutreachJob.status.in_(("succeeded", "dead_letter")),
+                )
+            ).rowcount or 0
+        return {"scores": scores, "runs": runs, "jobs": jobs}
 
     def calibration_report(self, minimum_labeled: int = 30) -> dict[str, Any]:
         with self.sessions() as session:

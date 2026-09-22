@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import csv
 import io
 import json
+import os
 from typing import Any
 from urllib.parse import urlparse
 
@@ -114,6 +115,22 @@ def validate_target_batch(candidates: Any) -> list[dict[str, Any]]:
     ids = [candidate["candidate_id"] for candidate in normalized]
     if len(ids) != len(set(ids)):
         raise ValueError("candidate_id values must be unique within a batch")
+    allowed = {
+        item.strip()
+        for item in os.environ.get("JEV_ALLOWED_SOURCE_TYPES", "").split(",")
+        if item.strip()
+    }
+    if allowed:
+        unsupported = sorted({
+            record["source_type"]
+            for candidate in normalized
+            for record in candidate["source_records"]
+            if record["source_type"] not in allowed
+        })
+        if unsupported:
+            raise ValueError(
+                "source types are not approved: " + ", ".join(unsupported)
+            )
     return normalized
 
 
