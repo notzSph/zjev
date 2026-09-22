@@ -155,6 +155,12 @@ Source records may include timezone-aware `captured_at` timestamps. Evidence old
 than 90 days, or candidates with no evidence items, are excluded from the eligible
 shortlist and require fresh research.
 
+For queued scoring, use `POST /v1/outreach/score/jobs`. It returns a job ID
+immediately, persists attempts and status, and processes the job in the API
+background worker. Failed jobs retry with exponential backoff and move to
+`dead_letter` after `max_attempts`. Poll `GET /v1/outreach/score/jobs/{job_id}`
+for the result.
+
 Record what happened after review/contact:
 
 ```bash

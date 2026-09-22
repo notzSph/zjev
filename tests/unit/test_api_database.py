@@ -32,6 +32,17 @@ class APIDatabaseTests(unittest.TestCase):
             self.assertEqual(store.get_run("run-1"), {"run_id": "run-1"})
             self.assertEqual(store.metrics()["outcomes"], {"replied": 1})
 
+    def test_sqlalchemy_job_queue_persists_completion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLAlchemyAuditStore(
+                f"sqlite:///{Path(directory) / 'jobs.db'}", create_schema=True
+            )
+            store.enqueue_job("job-1", {"run_id": "run-1"}, max_attempts=2)
+            job = store.claim_job("job-1")
+            self.assertEqual(job["status"], "running")
+            store.complete_job("job-1", {"ok": True})
+            self.assertEqual(store.get_job("job-1")["status"], "succeeded")
+
 
 if __name__ == "__main__":
     unittest.main()

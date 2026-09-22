@@ -2,16 +2,32 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import and_, create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from packages.outreach.audit import POSITIVE_OUTCOMES
 from .models.base import Base
-from .models import OutreachRun, OutreachScore
+from .models import OutreachJob, OutreachRun, OutreachScore
 from .session import create_engine_from_url
+
+
+def _job_dict(job: OutreachJob) -> dict[str, Any]:
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "attempts": job.attempts,
+        "max_attempts": job.max_attempts,
+        "payload": job.payload,
+        "result": job.result,
+        "last_error": job.last_error,
+        "available_at": job.available_at,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+    }
 
 
 class SQLAlchemyAuditStore:
@@ -59,6 +75,72 @@ class SQLAlchemyAuditStore:
                         created_at=datetime.now(timezone.utc),
                     )
                 )
+
+    def enqueue_job(self, job_id: str, payload: dict[str, Any], max_attempts: int = 3) -> dict[str, Any]:
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise ValueError("job_id must be a non-empty string")
+        if not isinstance(max_attempts, int) or max_attempts < 1:
+            raise ValueError("max_attempts must be a positive integer")
+        with self.sessions.begin() as session:
+            if session.get(OutreachJob, job_id) is None:
+                now = datetime.now(timezone.utc)
+                session.add(
+                    OutreachJob(
+                        job_id=job_id,
+                        status="queued",
+                        attempts=0,
+                        max_attempts=max_attempts,
+                        payload=payload,
+                        available_at=now,
+                        created_at=now,
+                    )
+                )
+        return self.get_job(job_id)  # type: ignore[return-value]
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with self.sessions() as session:
+            job = session.get(OutreachJob, job_id)
+            if job is None:
+                return None
+            return _job_dict(job)
+
+    def claim_job(self, job_id: str) -> dict[str, Any] | None:
+        now = datetime.now(timezone.utc)
+        with self.sessions.begin() as session:
+            job = session.scalar(
+                select(OutreachJob)
+                .where(
+                    and_(
+                        OutreachJob.job_id == job_id,
+                        OutreachJob.status == "queued",
+                        OutreachJob.available_at <= now,
+                    )
+                )
+                .with_for_update(skip_locked=True)
+            )
+            if job is None:
+                return None
+            job.status = "running"
+            job.attempts += 1
+            job.started_at = now
+        return self.get_job(job_id)
+
+    def complete_job(self, job_id: str, result: dict[str, Any]) -> None:
+        with self.sessions.begin() as session:
+            job = session.get(OutreachJob, job_id)
+            if job is not None and job.status == "running":
+                job.status = "succeeded"
+                job.result = result
+                job.completed_at = datetime.now(timezone.utc)
+
+    def fail_job(self, job_id: str, error: str) -> None:
+        with self.sessions.begin() as session:
+            job = session.get(OutreachJob, job_id)
+            if job is None:
+                raise ValueError("job_id was not found")
+            job.status = "dead_letter" if job.attempts >= job.max_attempts else "queued"
+            job.last_error = error[:2000]
+            job.available_at = datetime.now(timezone.utc) + timedelta(seconds=2 ** min(job.attempts, 6))
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         with self.sessions() as session:

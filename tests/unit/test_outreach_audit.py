@@ -1,6 +1,6 @@
 import unittest
 
-from packages.outreach import OutreachAuditStore, score_target_batch, validate_target_batch
+from packages.outreach import OutreachAuditStore, process_job, score_target_batch, validate_target_batch
 
 
 def _candidate():
@@ -70,6 +70,21 @@ class OutreachAuditTests(unittest.TestCase):
         self.assertEqual(action["positive_rate"], 1.0)
         self.assertEqual(action["status"], "insufficient_data")
         self.assertFalse(report["threshold_tuning_allowed"])
+
+    def test_job_queue_retries_and_completes(self):
+        store = OutreachAuditStore(":memory:")
+        store.enqueue_job("job-1", {"run_id": "run-1"}, max_attempts=2)
+        failed = process_job(store, "job-1", lambda _payload: (_ for _ in ()).throw(RuntimeError("boom")))
+        self.assertEqual(failed["status"], "queued")
+        self.assertEqual(failed["attempts"], 1)
+
+        store._connect().execute(
+            "UPDATE outreach_jobs SET available_at = ? WHERE job_id = ?",
+            ("1970-01-01T00:00:00+00:00", "job-1"),
+        )
+        completed = process_job(store, "job-1", lambda _payload: {"ok": True})
+        self.assertEqual(completed["status"], "succeeded")
+        self.assertEqual(completed["result"], {"ok": True})
 
 
 if __name__ == "__main__":

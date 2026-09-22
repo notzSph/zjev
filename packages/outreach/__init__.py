@@ -7,6 +7,7 @@ from .targets import import_target_csv, validate_target_batch, validate_target_c
 from .audit import OUTCOME_STATES, OutreachAuditStore, score_target_batch
 from .ranking import rank_scores, ranked_csv
 from .sources import SourceNotConfigured, search_google_places, source_status
+from .jobs import process_job
 
 __all__ = [
     "build_outreach_request",
@@ -23,4 +24,5 @@ __all__ = [
     "validate_target_batch",
     "validate_target_candidate",
     "import_target_csv",
+    "process_job",
 ]

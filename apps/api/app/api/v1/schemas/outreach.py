@@ -37,6 +37,10 @@ class ScoreBatchRequest(StrictModel):
     run_id: str | None = None
 
 
+class ScoreJobRequest(ScoreBatchRequest):
+    max_attempts: int = 3
+
+
 class RankRequest(StrictModel):
     scores: list[dict[str, Any]]
 

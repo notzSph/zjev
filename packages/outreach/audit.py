@@ -15,6 +15,22 @@ OUTCOME_STATES = {
 POSITIVE_OUTCOMES = {"replied", "qualified", "meeting_booked", "converted"}
 
 
+def _job_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "job_id": row["job_id"],
+        "status": row["status"],
+        "attempts": row["attempts"],
+        "max_attempts": row["max_attempts"],
+        "payload": json.loads(row["payload_json"]),
+        "result": json.loads(row["result_json"]) if row["result_json"] else None,
+        "last_error": row["last_error"],
+        "available_at": row["available_at"],
+        "created_at": row["created_at"],
+        "started_at": row["started_at"],
+        "completed_at": row["completed_at"],
+    }
+
+
 class OutreachAuditStore:
     def __init__(self, path: str | Path):
         self.path = str(path)
@@ -56,6 +72,23 @@ class OutreachAuditStore:
                     run_id TEXT PRIMARY KEY,
                     response_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS outreach_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    max_attempts INTEGER NOT NULL DEFAULT 3,
+                    payload_json TEXT NOT NULL,
+                    result_json TEXT,
+                    last_error TEXT,
+                    available_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    started_at TEXT,
+                    completed_at TEXT
                 )
                 """
             )
@@ -201,6 +234,67 @@ class OutreachAuditStore:
             connection.execute(
                 "INSERT OR IGNORE INTO outreach_runs (run_id, response_json, created_at) VALUES (?, ?, ?)",
                 (run_id, json.dumps({}), datetime.now(timezone.utc).isoformat()),
+            )
+
+    def enqueue_job(self, job_id: str, payload: dict[str, Any], max_attempts: int = 3) -> dict[str, Any]:
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise ValueError("job_id must be a non-empty string")
+        if not isinstance(max_attempts, int) or max_attempts < 1:
+            raise ValueError("max_attempts must be a positive integer")
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO outreach_jobs "
+                "(job_id, status, attempts, max_attempts, payload_json, available_at, created_at) "
+                "VALUES (?, 'queued', 0, ?, ?, ?, ?)",
+                (job_id, max_attempts, json.dumps(payload, sort_keys=True), now, now),
+            )
+        return self.get_job(job_id)  # type: ignore[return-value]
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM outreach_jobs WHERE job_id = ?", (job_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return _job_row(row)
+
+    def claim_job(self, job_id: str) -> dict[str, Any] | None:
+        now = datetime.now(timezone.utc)
+        now_text = now.isoformat()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "UPDATE outreach_jobs SET status = 'running', attempts = attempts + 1, "
+                "started_at = ? WHERE job_id = ? AND status = 'queued' AND available_at <= ?",
+                (now_text, job_id, now_text),
+            )
+            if cursor.rowcount != 1:
+                return None
+        return self.get_job(job_id)
+
+    def complete_job(self, job_id: str, result: dict[str, Any]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE outreach_jobs SET status = 'succeeded', result_json = ?, completed_at = ? "
+                "WHERE job_id = ? AND status = 'running'",
+                (json.dumps(result, sort_keys=True), datetime.now(timezone.utc).isoformat(), job_id),
+            )
+
+    def fail_job(self, job_id: str, error: str) -> None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT attempts, max_attempts FROM outreach_jobs WHERE job_id = ?", (job_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError("job_id was not found")
+            attempts, max_attempts = row["attempts"], row["max_attempts"]
+            terminal = attempts >= max_attempts
+            status = "dead_letter" if terminal else "queued"
+            available = datetime.now(timezone.utc) + timedelta(seconds=2 ** min(attempts, 6))
+            connection.execute(
+                "UPDATE outreach_jobs SET status = ?, last_error = ?, available_at = ? WHERE job_id = ?",
+                (status, error[:2000], available.isoformat(), job_id),
             )
 
 

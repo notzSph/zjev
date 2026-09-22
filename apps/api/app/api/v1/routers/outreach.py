@@ -4,7 +4,7 @@ import os
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 
 from packages.integrations.typesafe import evaluate
 from packages.outreach import (
@@ -15,6 +15,7 @@ from packages.outreach import (
     rank_scores,
     ranked_csv,
     score_target_batch,
+    process_job,
     search_google_places,
     source_status,
     validate_target_batch,
@@ -29,6 +30,7 @@ from ..schemas.outreach import (
     OutreachEvaluateRequest,
     RankRequest,
     ScoreBatchRequest,
+    ScoreJobRequest,
     TargetBatchRequest,
     TargetImportRequest,
     TargetPlanRequest,
@@ -36,6 +38,28 @@ from ..schemas.outreach import (
 
 router = APIRouter(prefix="/v1/outreach", tags=["outreach"])
 AuditStore = Annotated[Any, Depends(get_audit_store)]
+
+
+def _score_batch(payload: dict[str, Any], store: Any) -> dict[str, Any]:
+    candidates = validate_target_batch(payload["candidates"])
+    run_id = payload["run_id"]
+    cached = store.get_run(run_id)
+    if cached is not None and cached:
+        return {**cached, "idempotent_replay": True}
+    store.create_run(run_id)
+    scores = score_target_batch(
+        candidates, payload["offer"], payload["proof_assets"], evaluate, store, run_id
+    )
+    ranked = rank_scores(scores)
+    result = {
+        "run_id": run_id,
+        "count": len(ranked),
+        "scores": ranked,
+        "csv": ranked_csv(ranked),
+        "idempotent_replay": False,
+    }
+    store.save_run(run_id, result)
+    return result
 
 
 @router.post("/evaluate")
@@ -107,19 +131,42 @@ def score_google_businesses(
 
 @router.post("/score")
 def score(payload: ScoreBatchRequest, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
-    candidates = validate_target_batch(payload.candidates)
     run_id = payload.run_id or str(uuid.uuid4())
-    cached = store.get_run(run_id)
-    if cached is not None:
-        return {**cached, "idempotent_replay": True}
-    store.create_run(run_id)
-    scores = score_target_batch(
-        candidates, payload.offer, payload.proof_assets, evaluate, store, run_id
-    )
-    ranked = rank_scores(scores)
-    result = {"run_id": run_id, "count": len(ranked), "scores": ranked, "csv": ranked_csv(ranked), "idempotent_replay": False}
-    store.save_run(run_id, result)
-    return result
+    return _score_batch({**payload.model_dump(), "run_id": run_id}, store)
+
+
+@router.post("/score/jobs", status_code=status.HTTP_202_ACCEPTED)
+def enqueue_score_job(
+    payload: ScoreJobRequest,
+    background_tasks: BackgroundTasks,
+    _: AuthDependency,
+    store: AuditStore,
+) -> dict[str, Any]:
+    job_id = payload.run_id or str(uuid.uuid4())
+    job_payload = {**payload.model_dump(), "run_id": job_id}
+    job = store.enqueue_job(job_id, job_payload, payload.max_attempts)
+    if job["status"] == "queued":
+        background_tasks.add_task(
+            process_job,
+            store,
+            job_id,
+            lambda data: _score_batch(data, store),
+        )
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "attempts": job["attempts"],
+        "max_attempts": job["max_attempts"],
+        "idempotent_replay": job["attempts"] > 0 or job["status"] != "queued",
+    }
+
+
+@router.get("/score/jobs/{job_id}")
+def get_score_job(job_id: str, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
+    job = store.get_job(job_id)
+    if job is None:
+        raise ValueError("job_id was not found")
+    return job
 
 
 @router.post("/rank")
