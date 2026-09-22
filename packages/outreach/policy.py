@@ -31,8 +31,10 @@ def _noul(answers: dict[str, Any], name: str) -> bool | None:
     value = _answer(answers, name).get("noul")
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)) and value in (0, 1):
-        return bool(value)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        number = float(value)
+        if math.isfinite(number) and 0.0 <= number <= 1.0:
+            return number >= 0.5
     return None
 
 
