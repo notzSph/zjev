@@ -37,6 +37,17 @@ class OutreachAuditTests(unittest.TestCase):
         self.assertEqual(result[0]["policy"]["recommended_action"], "draft_for_review")
         self.assertEqual(result[0]["audit_id"], 1)
 
+    def test_records_outcome_and_metrics(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        store.record_outcome(result[0]["audit_id"], "replied", "Asked for more context")
+        self.assertEqual(store.metrics()["outcomes"], {"replied": 1})
+
+    def test_rejects_unknown_outcome(self):
+        store = OutreachAuditStore(":memory:")
+        with self.assertRaises(ValueError):
+            store.record_outcome(1, "maybe")
+
 
 if __name__ == "__main__":
     unittest.main()

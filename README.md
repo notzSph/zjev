@@ -110,6 +110,18 @@ curl -X POST http://localhost:8787/v1/outreach/score \
 Set `JEV_OUTREACH_DB` to configure the SQLite audit path. The scoring endpoint
 stores each raw evaluation and derived policy with the calibration version.
 
+Record what happened after review/contact:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/outcomes \
+  -H 'Content-Type: application/json' \
+  --data '{"audit_id":1,"outcome":"replied","note":"Asked for more context"}'
+```
+
+Read aggregate routing and outcome metrics at `POST /v1/outreach/metrics`.
+Supported outcomes include `replied`, `qualified`, `meeting_booked`,
+`converted`, `not_interested`, `disqualified`, and `no_response`.
+
 The outreach evaluator returns a typed angle, proof asset, personalization strength,
 likely objection, CTA type, readiness, and claim-risk signals. Its policy always
 requires human approval and sets `auto_send` to false. It produces a structured

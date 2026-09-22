@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+OUTCOME_STATES = {
+    "uncontacted", "contacted", "replied", "qualified", "meeting_booked",
+    "converted", "not_interested", "disqualified", "no_response",
+}
+
 
 class OutreachAuditStore:
     def __init__(self, path: str | Path):
@@ -48,6 +53,15 @@ class OutreachAuditStore:
                 "CREATE INDEX IF NOT EXISTS idx_outreach_scores_candidate "
                 "ON outreach_scores(candidate_id, created_at)"
             )
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(outreach_scores)")
+            }
+            if "outcome" not in columns:
+                connection.execute("ALTER TABLE outreach_scores ADD COLUMN outcome TEXT")
+            if "outcome_note" not in columns:
+                connection.execute("ALTER TABLE outreach_scores ADD COLUMN outcome_note TEXT")
+            if "outcome_at" not in columns:
+                connection.execute("ALTER TABLE outreach_scores ADD COLUMN outcome_at TEXT")
 
     def record(self, candidate: dict[str, Any], result: dict[str, Any]) -> int:
         policy = result.get("policy")
@@ -74,6 +88,40 @@ class OutreachAuditStore:
                 ),
             )
             return int(cursor.lastrowid)
+
+    def record_outcome(self, audit_id: int, outcome: str, note: str | None = None) -> None:
+        if not isinstance(audit_id, int) or audit_id <= 0:
+            raise ValueError("audit_id must be a positive integer")
+        if outcome not in OUTCOME_STATES:
+            raise ValueError(f"outcome must be one of: {', '.join(sorted(OUTCOME_STATES))}")
+        if note is not None and (not isinstance(note, str) or not note.strip()):
+            raise ValueError("outcome note must be a non-empty string when supplied")
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "UPDATE outreach_scores SET outcome = ?, outcome_note = ?, outcome_at = ? WHERE id = ?",
+                (outcome, note.strip() if note else None, datetime.now(timezone.utc).isoformat(), audit_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("audit_id was not found")
+
+    def metrics(self) -> dict[str, Any]:
+        with self._connect() as connection:
+            total = connection.execute("SELECT COUNT(*) FROM outreach_scores").fetchone()[0]
+            actions = {
+                row["recommended_action"]: row["count"]
+                for row in connection.execute(
+                    "SELECT recommended_action, COUNT(*) AS count "
+                    "FROM outreach_scores GROUP BY recommended_action"
+                )
+            }
+            outcomes = {
+                row["outcome"]: row["count"]
+                for row in connection.execute(
+                    "SELECT outcome, COUNT(*) AS count FROM outreach_scores "
+                    "WHERE outcome IS NOT NULL GROUP BY outcome"
+                )
+            }
+        return {"total_scores": total, "actions": actions, "outcomes": outcomes}
 
 
 def score_target_batch(

@@ -55,6 +55,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             "/v1/evaluate", "/v1/job_fit", "/v1/outreach/evaluate",
             "/v1/outreach/target-plan", "/v1/outreach/targets/validate",
             "/v1/outreach/score",
+            "/v1/outreach/outcomes", "/v1/outreach/metrics",
         }:
             self._json(404, {"error": "not_found"})
             return
@@ -109,6 +110,19 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     audit_store,
                 )
                 result = {"count": len(scores), "scores": scores}
+            elif self.path == "/v1/outreach/outcomes":
+                audit_store = OutreachAuditStore(
+                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
+                )
+                audit_store.record_outcome(
+                    payload.get("audit_id"), payload.get("outcome"), payload.get("note")
+                )
+                result = {"updated": True}
+            elif self.path == "/v1/outreach/metrics":
+                audit_store = OutreachAuditStore(
+                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
+                )
+                result = audit_store.metrics()
             else:
                 result = evaluate(payload)
             self._json(200, result)
