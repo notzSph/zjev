@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from .api.v1.routers.evaluations import router as evaluations_router
 from .api.v1.routers.outreach import router as outreach_router
 from .api.v1.routers.system import router as system_router
-from apps.api.config import APISettings
+from .core.config import APISettings
 
 
 def create_app() -> FastAPI:

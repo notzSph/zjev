@@ -8,8 +8,8 @@ from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from apps.api.config import APISettings
-from apps.api.database import SQLAlchemyAuditStore
+from ..core.config import APISettings
+from ..db.audit import SQLAlchemyAuditStore
 from packages.outreach import OutreachAuditStore
 
 

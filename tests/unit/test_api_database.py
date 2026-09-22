@@ -2,8 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from apps.api.config import APISettings
-from apps.api.database import SQLAlchemyAuditStore
+from apps.api.app.core.config import APISettings
+from apps.api.app.db.audit import SQLAlchemyAuditStore
 
 
 class APIDatabaseTests(unittest.TestCase):
