@@ -21,7 +21,7 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
-    command: ["python", "apps/api/server.py"]
+    command: ["sh", "-c", "alembic -c apps/api/alembic.ini upgrade head && python apps/api/server.py"]
     depends_on:
       postgres:
         condition: service_healthy

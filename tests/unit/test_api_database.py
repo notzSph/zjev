@@ -14,7 +14,9 @@ class APIDatabaseTests(unittest.TestCase):
 
     def test_sqlalchemy_store_persists_run_score_and_outcome(self):
         with tempfile.TemporaryDirectory() as directory:
-            store = SQLAlchemyAuditStore(f"sqlite:///{Path(directory) / 'outreach.db'}")
+            store = SQLAlchemyAuditStore(
+                f"sqlite:///{Path(directory) / 'outreach.db'}", create_schema=True
+            )
             candidate = {"candidate_id": "c-1"}
             result = {
                 "policy": {

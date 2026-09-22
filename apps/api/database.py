@@ -8,15 +8,22 @@ from typing import Any
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, OutreachRun, OutreachScore
+from .app.db.base import Base
+from .app.db.models import OutreachRun, OutreachScore
+from .app.db.session import create_engine_from_url
 from packages.outreach.audit import POSITIVE_OUTCOMES
 
 
 class SQLAlchemyAuditStore:
-    def __init__(self, database_url: str):
-        self.engine = create_engine(database_url, future=True)
+    def __init__(self, database_url: str, *, create_schema: bool = False):
+        self.engine = (
+            create_engine(database_url, future=True)
+            if database_url.startswith("sqlite")
+            else create_engine_from_url(database_url)
+        )
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)
-        Base.metadata.create_all(self.engine)
+        if create_schema:
+            Base.metadata.create_all(self.engine)
 
     def record(self, candidate: dict[str, Any], result: dict[str, Any], run_id: str | None = None) -> int:
         policy = result.get("policy")

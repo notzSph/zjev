@@ -33,7 +33,8 @@ Every API response includes a request ID for tracing.
 
 Production persistence uses SQLAlchemy with Postgres. Set `JEV_DATABASE_URL`.
 Compose includes a Postgres 16 service and waits for its healthcheck before
-starting the API. SQLite remains available for local development and tests.
+starting the API. Alembic owns schema changes and runs before the API starts.
+SQLite remains available for local development and tests only.
 
 Get the key from the TypeSafe dashboard. Do not put it in source, prompts,
 Discord, or the request body. `TYPESAFE_API_KEY` is also accepted for
