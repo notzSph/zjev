@@ -76,6 +76,40 @@ curl -X POST http://localhost:8787/v1/outreach/evaluate \
   --data '{"target_profile":"...","linkedin_activity":"...","prior_interactions":"...","offer":"...","proof_assets":["..."]}'
 ```
 
+Build a bounded target-selection plan before researching candidates:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/target-plan \
+  -H 'Content-Type: application/json' \
+  --data '{"offer":"workflow automation","geography":"Piedmont, Italy"}'
+```
+
+The target plan creates search terms, qualification requirements, exclusions,
+and a manual research workflow. It does not scrape, contact, or auto-send.
+
+Validate a manually collected candidate batch before scoring:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/targets/validate \
+  -H 'Content-Type: application/json' \
+  --data '{"candidates":[{"candidate_id":"c-001","company_name":"Example SMB","role":"COO","geography":"Piedmont, Italy","target_profile":"...","linkedin_activity":"...","source_urls":["https://example.com/profile"]}]}'
+```
+
+The structured candidate record is the foundation for a relational audit store.
+Embeddings can later index the evidence text for semantic retrieval, but they
+must not replace candidate identity, source URLs, scores, outcomes, or audit history.
+
+Score a validated candidate batch:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/score \
+  -H 'Content-Type: application/json' \
+  --data '{"offer":"workflow automation","proof_assets":["case study"],"candidates":[{"candidate_id":"c-001","company_name":"Example SMB","role":"COO","geography":"Piedmont, Italy","target_profile":"...","linkedin_activity":"...","source_urls":["https://example.com/profile"]}]}'
+```
+
+Set `JEV_OUTREACH_DB` to configure the SQLite audit path. The scoring endpoint
+stores each raw evaluation and derived policy with the calibration version.
+
 The outreach evaluator returns a typed angle, proof asset, personalization strength,
 likely objection, CTA type, readiness, and claim-risk signals. Its policy always
 requires human approval and sets `auto_send` to false. It produces a structured

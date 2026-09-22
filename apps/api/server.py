@@ -22,7 +22,14 @@ if VENDOR.is_dir() and str(VENDOR) not in sys.path:
 
 from packages.core.contracts import InputError  # noqa: E402
 from packages.job_fit import build_job_fit_request, derive_job_fit_policy  # noqa: E402
-from packages.outreach import build_outreach_request, derive_outreach_policy  # noqa: E402
+from packages.outreach import (  # noqa: E402
+    build_outreach_request,
+    build_target_selection_plan,
+    derive_outreach_policy,
+    OutreachAuditStore,
+    score_target_batch,
+    validate_target_batch,
+)
 from packages.integrations.typesafe import evaluate  # noqa: E402
 
 MAX_BODY_BYTES = 1_000_000
@@ -44,7 +51,11 @@ class JevAPIHandler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path not in {"/v1/evaluate", "/v1/job_fit", "/v1/outreach/evaluate"}:
+        if self.path not in {
+            "/v1/evaluate", "/v1/job_fit", "/v1/outreach/evaluate",
+            "/v1/outreach/target-plan", "/v1/outreach/targets/validate",
+            "/v1/outreach/score",
+        }:
             self._json(404, {"error": "not_found"})
             return
         try:
@@ -69,6 +80,35 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     payload.get("model", "jev-latest"),
                 ))
                 result["policy"] = derive_outreach_policy(result)
+            elif self.path == "/v1/outreach/target-plan":
+                result = build_target_selection_plan(
+                    payload.get("offer"),
+                    payload.get("geography"),
+                    payload.get("company_terms"),
+                    payload.get("buyer_titles"),
+                    payload.get("priority_signals"),
+                )
+            elif self.path == "/v1/outreach/targets/validate":
+                candidates = validate_target_batch(payload.get("candidates"))
+                result = {
+                    "count": len(candidates),
+                    "candidates": candidates,
+                    "ready_for_scoring": True,
+                    "vector_indexed": False,
+                }
+            elif self.path == "/v1/outreach/score":
+                candidates = validate_target_batch(payload.get("candidates"))
+                audit_store = OutreachAuditStore(
+                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
+                )
+                scores = score_target_batch(
+                    candidates,
+                    payload.get("offer"),
+                    payload.get("proof_assets"),
+                    evaluate,
+                    audit_store,
+                )
+                result = {"count": len(scores), "scores": scores}
             else:
                 result = evaluate(payload)
             self._json(200, result)
