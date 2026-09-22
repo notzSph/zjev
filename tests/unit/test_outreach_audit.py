@@ -37,6 +37,8 @@ class OutreachAuditTests(unittest.TestCase):
         self.assertEqual(result[0]["policy"]["recommended_action"], "draft_for_review")
         self.assertEqual(result[0]["audit_id"], 1)
         self.assertTrue(result[0]["evidence_packet"]["citation_required"])
+        self.assertEqual(result[0]["evidence_packet"]["citation_status"], "missing")
+        self.assertIn("icp_fit", result[0]["evidence_packet"]["uncited_answers"])
 
     def test_records_outcome_and_metrics(self):
         store = OutreachAuditStore(":memory:")

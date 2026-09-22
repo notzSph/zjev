@@ -122,6 +122,12 @@ JSON
 The import path only normalizes and validates data. It does not scrape or infer
 missing evidence.
 
+Every score now includes an evidence packet with stable item IDs, per-answer
+citation mappings, uncited-answer flags, source freshness, and contradiction
+flags. Model answers may cite supplied items with `evidence_ids`; invalid or
+missing references remain visible for review instead of being silently treated
+as proof.
+
 Source status is available at `POST /v1/outreach/sources/status`. Google Places
 company discovery is available at `POST /v1/outreach/sources/google-places` when
 `GOOGLE_MAPS_API_KEY` is configured. Its results are discovery-only leads and

@@ -220,25 +220,62 @@ def score_target_batch(
         if not isinstance(raw, dict):
             raise ValueError("evaluator must return an object")
         policy = derive_policy(raw)
+        evidence_packet = build_evidence_packet(candidate, raw)
         result = {
             "candidate_id": candidate["candidate_id"],
             "result": raw,
             "policy": policy,
-            "evidence_packet": {
-                "items": [
-                    {"id": f"{candidate['candidate_id']}:evidence:{index}", "text": text}
-                    for index, text in enumerate(candidate.get("evidence", []), start=1)
-                ],
-                "source_urls": candidate["source_urls"],
-                "source_records": candidate["source_records"],
-                "freshness_status": _freshness_status(candidate["source_records"]),
-                "citation_required": True,
-            },
+            "evidence_packet": evidence_packet,
         }
         if audit_store is not None:
             result["audit_id"] = audit_store.record(candidate, result, run_id)
         scored.append(result)
     return scored
+
+
+def build_evidence_packet(candidate: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    """Create a stable evidence catalog and map model-provided citations to it."""
+    items = [
+        {
+            "id": f"{candidate['candidate_id']}:evidence:{index}",
+            "text": text,
+            "source_url": candidate.get("source_urls", [])[index - 1]
+            if index <= len(candidate.get("source_urls", []))
+            else None,
+        }
+        for index, text in enumerate(candidate.get("evidence", []), start=1)
+    ]
+    valid_ids = {item["id"] for item in items}
+    citations: dict[str, list[str]] = {}
+    uncited_answers: list[str] = []
+    for name, answer in result.get("answers", {}).items():
+        if not isinstance(answer, dict):
+            uncited_answers.append(name)
+            continue
+        refs = answer.get("evidence_ids", answer.get("citations", []))
+        if not isinstance(refs, list):
+            refs = []
+        valid_refs = [ref for ref in refs if isinstance(ref, str) and ref in valid_ids]
+        citations[name] = valid_refs
+        if not valid_refs:
+            uncited_answers.append(name)
+    contradictions = [
+        record.get("contradiction") or record.get("contradicts")
+        for record in candidate.get("source_records", [])
+        if isinstance(record, dict) and (record.get("contradiction") or record.get("contradicts"))
+    ]
+    return {
+        "items": items,
+        "source_urls": candidate.get("source_urls", []),
+        "source_records": candidate.get("source_records", []),
+        "freshness_status": _freshness_status(candidate.get("source_records", [])),
+        "citation_required": True,
+        "answer_citations": citations,
+        "citation_status": "complete" if not uncited_answers else "missing",
+        "uncited_answers": uncited_answers,
+        "contradictions": contradictions,
+        "contradiction_status": "review" if contradictions else "none_detected",
+    }
 
 
 def _freshness_status(source_records: list[dict[str, Any]], max_age_days: int = 90) -> str:
