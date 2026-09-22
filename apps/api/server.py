@@ -22,6 +22,7 @@ if VENDOR.is_dir() and str(VENDOR) not in sys.path:
 
 from packages.core.contracts import InputError  # noqa: E402
 from packages.job_fit import build_job_fit_request, derive_job_fit_policy  # noqa: E402
+from packages.outreach import build_outreach_request, derive_outreach_policy  # noqa: E402
 from packages.integrations.typesafe import evaluate  # noqa: E402
 
 MAX_BODY_BYTES = 1_000_000
@@ -43,7 +44,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path not in {"/v1/evaluate", "/v1/job_fit"}:
+        if self.path not in {"/v1/evaluate", "/v1/job_fit", "/v1/outreach/evaluate"}:
             self._json(404, {"error": "not_found"})
             return
         try:
@@ -58,6 +59,16 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     payload.get("model", "jev-latest"),
                 ))
                 result["policy"] = derive_job_fit_policy(result)
+            elif self.path == "/v1/outreach/evaluate":
+                result = evaluate(build_outreach_request(
+                    payload.get("target_profile"),
+                    payload.get("linkedin_activity"),
+                    payload.get("offer"),
+                    payload.get("proof_assets"),
+                    payload.get("prior_interactions"),
+                    payload.get("model", "jev-latest"),
+                ))
+                result["policy"] = derive_outreach_policy(result)
             else:
                 result = evaluate(payload)
             self._json(200, result)

@@ -41,7 +41,7 @@ keeping local verification dependency-free.
 ## Docker Compose
 
 Compose wraps the existing CLI and the first real API surface. The API has one
-health endpoint and two evaluation endpoints. No background workers are added.
+health endpoint and three evaluation endpoints. No background workers are added.
 
 ```bash
 export JEV_API_KEY='...'
@@ -67,6 +67,26 @@ curl -X POST http://localhost:8787/v1/job_fit \
   -H 'Content-Type: application/json' \
   --data '{"cv":"...","job_description":"..."}'
 ```
+
+Prepare an outreach brief from supplied LinkedIn context and proof assets:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/evaluate \
+  -H 'Content-Type: application/json' \
+  --data '{"target_profile":"...","linkedin_activity":"...","prior_interactions":"...","offer":"...","proof_assets":["..."]}'
+```
+
+The outreach evaluator returns a typed angle, proof asset, personalization strength,
+likely objection, CTA type, readiness, and claim-risk signals. Its policy always
+requires human approval and sets `auto_send` to false. It produces a structured
+brief for drafting, not an autonomous message or send action.
+
+The evaluator includes the current z-calibration: Piedmont and Italy, SMBs with
+concrete operational or digital workflow problems, CEO/CTO/COO/digital and
+innovation leads, custom software/AI automation/data pipeline offer lanes, and
+the manual connection-to-call sequence. The calibration is versioned and visible
+in the request state. It is a working operating model, not historical conversion
+data, so outcome-based threshold tuning remains a later step.
 
 The job evaluator returns independent typed dimensions for requirements,
 technical work, architecture, leadership, delivery, governance, seniority,
