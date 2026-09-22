@@ -1,5 +1,6 @@
 """Conservative routing for outreach intelligence results."""
 
+import math
 from typing import Any
 
 from .calibration import Z_CALIBRATION_VERSION
@@ -12,12 +13,18 @@ def _answer(answers: dict[str, Any], name: str) -> dict[str, Any]:
 
 def _score(answers: dict[str, Any], name: str) -> float | None:
     value = _answer(answers, name).get("score")
-    return float(value) if isinstance(value, (int, float)) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) and 0.0 <= number <= 4.0 else None
 
 
 def _confidence(answers: dict[str, Any], name: str) -> float | None:
     value = _answer(answers, name).get("confidence")
-    return float(value) if isinstance(value, (int, float)) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) and 0.0 <= number <= 1.0 else None
 
 
 def _noul(answers: dict[str, Any], name: str) -> bool | None:
@@ -27,6 +34,11 @@ def _noul(answers: dict[str, Any], name: str) -> bool | None:
     if isinstance(value, (int, float)) and value in (0, 1):
         return bool(value)
     return None
+
+
+def _choice(answers: dict[str, Any], name: str, allowed: set[str]) -> str | None:
+    value = _answer(answers, name).get("choice")
+    return value if isinstance(value, str) and value in allowed else None
 
 
 def derive_outreach_policy(result: dict[str, Any]) -> dict[str, Any]:
@@ -41,8 +53,12 @@ def derive_outreach_policy(result: dict[str, Any]) -> dict[str, Any]:
     account_safety_risk = _score(answers, "account_safety_risk")
     readiness = _noul(answers, "outreach_readiness")
     unsupported = _noul(answers, "unsupported_claim_risk")
-    angle = _answer(answers, "best_outreach_angle").get("choice")
-    cta = _answer(answers, "cta_type").get("choice")
+    angle = _choice(answers, "best_outreach_angle", {
+        "relevant_problem", "relevant_result", "relevant_insight", "no_defensible_angle",
+    })
+    cta = _choice(answers, "cta_type", {
+        "share_resource", "ask_context", "suggest_conversation", "no_cta",
+    })
     missing = [
         name for name, value in {
             "personalization_evidence": personalization,
@@ -53,6 +69,8 @@ def derive_outreach_policy(result: dict[str, Any]) -> dict[str, Any]:
             "account_safety_risk": account_safety_risk,
             "outreach_readiness": readiness,
             "unsupported_claim_risk": unsupported,
+            "best_outreach_angle": angle,
+            "cta_type": cta,
         }.items()
         if value is None
     ]
