@@ -36,6 +36,7 @@ class OutreachAuditTests(unittest.TestCase):
         result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
         self.assertEqual(result[0]["policy"]["recommended_action"], "draft_for_review")
         self.assertEqual(result[0]["audit_id"], 1)
+        self.assertTrue(result[0]["evidence_packet"]["citation_required"])
 
     def test_records_outcome_and_metrics(self):
         store = OutreachAuditStore(":memory:")

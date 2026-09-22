@@ -28,6 +28,8 @@ from packages.outreach import (  # noqa: E402
     derive_outreach_policy,
     OutreachAuditStore,
     score_target_batch,
+    rank_scores,
+    ranked_csv,
     validate_target_batch,
 )
 from packages.integrations.typesafe import evaluate  # noqa: E402
@@ -55,6 +57,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             "/v1/evaluate", "/v1/job_fit", "/v1/outreach/evaluate",
             "/v1/outreach/target-plan", "/v1/outreach/targets/validate",
             "/v1/outreach/score",
+            "/v1/outreach/rank",
             "/v1/outreach/outcomes", "/v1/outreach/metrics",
         }:
             self._json(404, {"error": "not_found"})
@@ -109,7 +112,11 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     evaluate,
                     audit_store,
                 )
-                result = {"count": len(scores), "scores": scores}
+                ranked = rank_scores(scores)
+                result = {"count": len(ranked), "scores": ranked, "csv": ranked_csv(ranked)}
+            elif self.path == "/v1/outreach/rank":
+                ranked = rank_scores(payload.get("scores"))
+                result = {"count": len(ranked), "scores": ranked, "csv": ranked_csv(ranked)}
             elif self.path == "/v1/outreach/outcomes":
                 audit_store = OutreachAuditStore(
                     os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")

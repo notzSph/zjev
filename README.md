@@ -109,6 +109,8 @@ curl -X POST http://localhost:8787/v1/outreach/score \
 
 Set `JEV_OUTREACH_DB` to configure the SQLite audit path. The scoring endpoint
 stores each raw evaluation and derived policy with the calibration version.
+The response also includes a deterministic rank score, eligibility flag, evidence
+packet, and CSV shortlist export. Ranking never overrides the safety policy.
 
 Record what happened after review/contact:
 

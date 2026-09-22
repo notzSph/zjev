@@ -139,7 +139,19 @@ def score_target_batch(
         if not isinstance(raw, dict):
             raise ValueError("evaluator must return an object")
         policy = derive_policy(raw)
-        result = {"candidate_id": candidate["candidate_id"], "result": raw, "policy": policy}
+        result = {
+            "candidate_id": candidate["candidate_id"],
+            "result": raw,
+            "policy": policy,
+            "evidence_packet": {
+                "items": [
+                    {"id": f"{candidate['candidate_id']}:evidence:{index}", "text": text}
+                    for index, text in enumerate(candidate.get("evidence", []), start=1)
+                ],
+                "source_urls": candidate["source_urls"],
+                "citation_required": True,
+            },
+        }
         if audit_store is not None:
             result["audit_id"] = audit_store.record(candidate, result)
         scored.append(result)
