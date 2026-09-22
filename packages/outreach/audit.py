@@ -12,6 +12,7 @@ OUTCOME_STATES = {
     "uncontacted", "contacted", "replied", "qualified", "meeting_booked",
     "converted", "not_interested", "disqualified", "no_response",
 }
+POSITIVE_OUTCOMES = {"replied", "qualified", "meeting_booked", "converted"}
 
 
 class OutreachAuditStore:
@@ -130,7 +131,43 @@ class OutreachAuditStore:
                     "WHERE outcome IS NOT NULL GROUP BY outcome"
                 )
             }
-        return {"total_scores": total, "actions": actions, "outcomes": outcomes}
+        return {
+            "total_scores": total,
+            "actions": actions,
+            "outcomes": outcomes,
+            "calibration": self.calibration_report(),
+        }
+
+    def calibration_report(self, minimum_labeled: int = 30) -> dict[str, Any]:
+        if not isinstance(minimum_labeled, int) or minimum_labeled < 1:
+            raise ValueError("minimum_labeled must be a positive integer")
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT recommended_action, outcome, COUNT(*) AS count "
+                "FROM outreach_scores WHERE outcome IS NOT NULL "
+                "GROUP BY recommended_action, outcome"
+            ).fetchall()
+        groups: dict[str, dict[str, int]] = {}
+        for row in rows:
+            groups.setdefault(row["recommended_action"], {})[row["outcome"]] = row["count"]
+        by_action = {}
+        for action, counts in groups.items():
+            labeled = sum(counts.values())
+            positive = sum(count for outcome, count in counts.items() if outcome in POSITIVE_OUTCOMES)
+            by_action[action] = {
+                "labeled": labeled,
+                "positive": positive,
+                "positive_rate": round(positive / labeled, 4) if labeled else None,
+                "status": "ready" if labeled >= minimum_labeled else "insufficient_data",
+                "outcomes": counts,
+            }
+        return {
+            "minimum_labeled": minimum_labeled,
+            "by_action": by_action,
+            "threshold_tuning_allowed": all(
+                item["status"] == "ready" for item in by_action.values()
+            ) and bool(by_action),
+        }
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         if not isinstance(run_id, str) or not run_id.strip():

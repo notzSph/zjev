@@ -143,6 +143,10 @@ Read aggregate routing and outcome metrics at `POST /v1/outreach/metrics`.
 Supported outcomes include `replied`, `qualified`, `meeting_booked`,
 `converted`, `not_interested`, `disqualified`, and `no_response`.
 
+Read the calibration report at `POST /v1/outreach/calibration`. It reports
+outcome rates by routing action but refuses to mark threshold tuning ready until
+the minimum labelled sample is reached.
+
 The outreach evaluator returns a typed angle, proof asset, personalization strength,
 likely objection, CTA type, readiness, and claim-risk signals. Its policy always
 requires human approval and sets `auto_send` to false. It produces a structured

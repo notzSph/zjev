@@ -57,6 +57,16 @@ class OutreachAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.save_run("", response)
 
+    def test_calibration_report_refuses_small_samples(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        store.record_outcome(result[0]["audit_id"], "replied")
+        report = store.calibration_report(minimum_labeled=2)
+        action = report["by_action"]["draft_for_review"]
+        self.assertEqual(action["positive_rate"], 1.0)
+        self.assertEqual(action["status"], "insufficient_data")
+        self.assertFalse(report["threshold_tuning_allowed"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -61,7 +61,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             "/v1/outreach/score",
             "/v1/outreach/rank",
             "/v1/outreach/targets/import",
-            "/v1/outreach/outcomes", "/v1/outreach/metrics",
+            "/v1/outreach/outcomes", "/v1/outreach/metrics", "/v1/outreach/calibration",
         }:
             self._json(404, {"error": "not_found"})
             return
@@ -150,6 +150,11 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
                 )
                 result = audit_store.metrics()
+            elif self.path == "/v1/outreach/calibration":
+                audit_store = OutreachAuditStore(
+                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
+                )
+                result = audit_store.calibration_report(payload.get("minimum_labeled", 30))
             else:
                 result = evaluate(payload)
             self._json(200, result)
