@@ -27,8 +27,8 @@ class SourceTests(unittest.TestCase):
         self.assertTrue(leads[0]["discovery_only"])
         self.assertEqual(leads[0]["source_records"][0]["source_type"], "google_places")
 
-    def test_source_status_keeps_linkedin_explicitly_manual(self):
-        self.assertFalse(source_status()["linkedin"]["available"])
+    def test_source_status_exposes_business_sources(self):
+        self.assertNotIn("linkedin", source_status())
         self.assertEqual(source_status()["csv"]["mode"], "import")
 
 

@@ -28,12 +28,6 @@ def source_status() -> dict[str, dict[str, Any]]:
             "mode": "company_discovery",
             "requires_credentials": True,
         },
-        "linkedin": {
-            "available": False,
-            "mode": "manual_or_approved_api_import",
-            "requires_credentials": True,
-            "reason": "No general free people-search API is assumed",
-        },
         "zcrm": {
             "available": bool(os.environ.get("ZCRM_API_URL") and os.environ.get("ZCRM_API_TOKEN")),
             "mode": "crm_import",
@@ -63,7 +57,7 @@ def _lead(place: dict[str, Any]) -> dict[str, Any]:
         "role": "unresolved buyer role",
         "geography": address or "unknown",
         "target_profile": f"Company discovered through Google Places: {name.strip()}",
-        "linkedin_activity": "No LinkedIn activity supplied; manual enrichment required",
+        "linkedin_activity": "No activity supplied; manual enrichment required",
         "evidence": evidence,
         "source_urls": [maps_uri],
         "source_records": [{
