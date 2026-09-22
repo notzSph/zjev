@@ -36,9 +36,14 @@ def rank_scores(scores: list[dict[str, Any]]) -> list[dict[str, Any]]:
         policy = item["policy"]
         enriched = dict(item)
         enriched["rank_score"] = _rank_score(item)
-        enriched["eligible"] = policy.get("recommended_action") in {
-            "draft_for_review", "human_review"
-        }
+        evidence = item.get("evidence_packet", {})
+        has_evidence = bool(evidence.get("items")) if isinstance(evidence, dict) else True
+        is_stale = isinstance(evidence, dict) and evidence.get("freshness_status") == "stale"
+        enriched["eligible"] = (
+            policy.get("recommended_action") in {"draft_for_review", "human_review"}
+            and has_evidence
+            and not is_stale
+        )
         ranked.append(enriched)
     ranked.sort(
         key=lambda item: (

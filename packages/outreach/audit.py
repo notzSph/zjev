@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +149,8 @@ def score_target_batch(
                     for index, text in enumerate(candidate.get("evidence", []), start=1)
                 ],
                 "source_urls": candidate["source_urls"],
+                "source_records": candidate["source_records"],
+                "freshness_status": _freshness_status(candidate["source_records"]),
                 "citation_required": True,
             },
         }
@@ -156,6 +158,15 @@ def score_target_batch(
             result["audit_id"] = audit_store.record(candidate, result)
         scored.append(result)
     return scored
+
+
+def _freshness_status(source_records: list[dict[str, Any]], max_age_days: int = 90) -> str:
+    timestamps = [record.get("captured_at") for record in source_records if record.get("captured_at")]
+    if not timestamps:
+        return "unknown"
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    parsed = [datetime.fromisoformat(value) for value in timestamps]
+    return "fresh" if max(parsed) >= cutoff else "stale"
 
 
 def build_request_for_candidate(

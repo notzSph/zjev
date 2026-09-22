@@ -30,6 +30,16 @@ class TargetBatchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_target_batch([candidate])
 
+    def test_normalizes_source_record_timestamp(self):
+        candidate = _candidate()
+        candidate["source_records"] = [{
+            "url": "https://example.com/profile",
+            "captured_at": "2026-09-22T10:00:00+02:00",
+            "source_type": "profile",
+        }]
+        result = validate_target_batch([candidate])[0]
+        self.assertEqual(result["source_records"][0]["captured_at"], "2026-09-22T08:00:00+00:00")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,10 @@ from packages.outreach import rank_scores, ranked_csv
 def _score(candidate_id, action, fit):
     return {
         "candidate_id": candidate_id,
+        "evidence_packet": {
+            "items": [{"id": f"{candidate_id}:e1"}],
+            "freshness_status": "fresh",
+        },
         "policy": {
             "recommended_action": action,
             "confidence_band": "proceed",
@@ -32,6 +36,15 @@ class OutreachRankingTests(unittest.TestCase):
     def test_rejects_missing_policy(self):
         with self.assertRaises(ValueError):
             rank_scores([{"candidate_id": "bad"}])
+
+    def test_stale_or_empty_evidence_is_not_eligible(self):
+        stale = _score("stale", "draft_for_review", 4)
+        stale["evidence_packet"] = {"items": [{"id": "e1"}], "freshness_status": "stale"}
+        empty = _score("empty", "draft_for_review", 4)
+        empty["evidence_packet"] = {"items": [], "freshness_status": "fresh"}
+        ranked = rank_scores([stale, empty])
+        self.assertFalse(next(item for item in ranked if item["candidate_id"] == "stale")["eligible"])
+        self.assertFalse(next(item for item in ranked if item["candidate_id"] == "empty")["eligible"])
 
 
 if __name__ == "__main__":

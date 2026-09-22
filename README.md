@@ -111,6 +111,9 @@ Set `JEV_OUTREACH_DB` to configure the SQLite audit path. The scoring endpoint
 stores each raw evaluation and derived policy with the calibration version.
 The response also includes a deterministic rank score, eligibility flag, evidence
 packet, and CSV shortlist export. Ranking never overrides the safety policy.
+Source records may include timezone-aware `captured_at` timestamps. Evidence older
+than 90 days, or candidates with no evidence items, are excluded from the eligible
+shortlist and require fresh research.
 
 Record what happened after review/contact:
 

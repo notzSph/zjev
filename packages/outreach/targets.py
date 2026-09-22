@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -29,6 +30,41 @@ def _url(value: Any, name: str) -> str:
     return result
 
 
+def _timestamp(value: Any, name: str) -> str:
+    result = _text(value, name)
+    try:
+        parsed = datetime.fromisoformat(result.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"{name} must be an ISO-8601 timestamp") from error
+    if parsed.tzinfo is None:
+        raise ValueError(f"{name} must include a timezone")
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _source_records(value: Any, urls: list[str], name: str) -> list[dict[str, Any]]:
+    if value is None:
+        return [{"url": url, "captured_at": None, "source_type": "unknown"} for url in urls]
+    if not isinstance(value, list) or len(value) > MAX_EVIDENCE_ITEMS:
+        raise ValueError(f"{name} must be a list of up to {MAX_EVIDENCE_ITEMS} objects")
+    records = []
+    seen = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"{name} item {index} must be an object")
+        url = _url(item.get("url"), f"{name} item {index} url")
+        if url in seen:
+            continue
+        seen.add(url)
+        captured_at = item.get("captured_at")
+        records.append({
+            "url": url,
+            "captured_at": _timestamp(captured_at, f"{name} item {index} captured_at")
+            if captured_at is not None else None,
+            "source_type": _text(item.get("source_type", "unknown"), f"{name} item {index} source_type"),
+        })
+    return records
+
+
 def _evidence(value: Any, name: str) -> list[str]:
     if value is None:
         return []
@@ -46,6 +82,7 @@ def validate_target_candidate(candidate: Any, index: int = 0) -> dict[str, Any]:
     if not isinstance(source_urls, list) or not source_urls:
         raise ValueError(f"candidate {index} needs at least one source_urls entry")
     normalized_urls = [_url(item, f"candidate {index} source_urls") for item in source_urls]
+    normalized_urls = list(dict.fromkeys(normalized_urls))
     return {
         "candidate_id": _text(candidate.get("candidate_id"), f"candidate {index} candidate_id"),
         "person_name": _optional_text(candidate.get("person_name"), f"candidate {index} person_name"),
@@ -58,7 +95,10 @@ def validate_target_candidate(candidate: Any, index: int = 0) -> dict[str, Any]:
             candidate.get("prior_interactions"), f"candidate {index} prior_interactions"
         ),
         "evidence": _evidence(candidate.get("evidence"), f"candidate {index} evidence"),
-        "source_urls": list(dict.fromkeys(normalized_urls)),
+        "source_urls": normalized_urls,
+        "source_records": _source_records(
+            candidate.get("source_records"), normalized_urls, f"candidate {index} source_records"
+        ),
     }
 
 
