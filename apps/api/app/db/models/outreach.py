@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..base import Base
+from .base import Base
 
 
 class OutreachRun(Base):

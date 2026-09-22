@@ -20,7 +20,7 @@ from packages.outreach import (
     validate_target_batch,
 )
 
-from ...dependencies import AuthDependency, get_audit_store
+from ...deps import AuthDependency, get_audit_store
 from ..schemas.outreach import (
     CalibrationRequest,
     GooglePlacesRequest,

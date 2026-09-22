@@ -4,7 +4,7 @@ from logging.config import fileConfig
 
 from alembic import context
 
-from app.db.base import Base
+from app.db.models.base import Base
 from app.db.config import persistence_settings_from_env
 from app.db import models  # noqa: F401
 from app.db.session import create_engine_from_url

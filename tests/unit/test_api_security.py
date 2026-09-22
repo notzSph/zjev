@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from apps.api.app.api.dependencies import require_auth
+from apps.api.app.api.deps import require_auth
 from fastapi import HTTPException
 
 

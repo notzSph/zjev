@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from packages.integrations.typesafe import evaluate
 from packages.job_fit import build_job_fit_request, derive_job_fit_policy
 
-from ...dependencies import AuthDependency
+from ...deps import AuthDependency
 from ..schemas.evaluations import GenericEvaluateRequest, JobFitRequest
 
 router = APIRouter(prefix="/v1", tags=["evaluations"])

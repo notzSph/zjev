@@ -1,4 +1,4 @@
-"""Shared SQLAlchemy metadata for versioned API persistence."""
+"""Shared SQLAlchemy declarative metadata."""
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase

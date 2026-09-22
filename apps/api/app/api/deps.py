@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Request
 
 from ..core.config import APISettings
-from ..db.audit import SQLAlchemyAuditStore
+from ..db.db import SQLAlchemyAuditStore
 from packages.outreach import OutreachAuditStore
 
 

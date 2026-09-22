@@ -1,4 +1,4 @@
-"""SQLAlchemy audit store."""
+"""SQLAlchemy audit database adapter."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from packages.outreach.audit import POSITIVE_OUTCOMES
-from .base import Base
+from .models.base import Base
 from .models import OutreachRun, OutreachScore
 from .session import create_engine_from_url
 
