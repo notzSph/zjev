@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import csv
+import io
+import json
 from typing import Any
 from urllib.parse import urlparse
 
@@ -112,3 +115,29 @@ def validate_target_batch(candidates: Any) -> list[dict[str, Any]]:
     if len(ids) != len(set(ids)):
         raise ValueError("candidate_id values must be unique within a batch")
     return normalized
+
+
+def import_target_csv(content: Any) -> list[dict[str, Any]]:
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("csv must be a non-empty string")
+    reader = csv.DictReader(io.StringIO(content))
+    required = {
+        "candidate_id", "company_name", "role", "geography",
+        "target_profile", "linkedin_activity", "source_urls",
+    }
+    headers = set(reader.fieldnames or [])
+    missing = sorted(required - headers)
+    if missing:
+        raise ValueError(f"csv missing required columns: {', '.join(missing)}")
+    candidates = []
+    for index, row in enumerate(reader):
+        candidate = dict(row)
+        candidate["source_urls"] = [item.strip() for item in row["source_urls"].split(";") if item.strip()]
+        candidate["evidence"] = [item.strip() for item in (row.get("evidence") or "").split("||") if item.strip()]
+        if row.get("source_records"):
+            try:
+                candidate["source_records"] = json.loads(row["source_records"])
+            except json.JSONDecodeError as error:
+                raise ValueError(f"csv row {index + 2} source_records must be JSON") from error
+        candidates.append(candidate)
+    return validate_target_batch(candidates)

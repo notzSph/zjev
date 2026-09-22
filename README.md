@@ -99,6 +99,20 @@ The structured candidate record is the foundation for a relational audit store.
 Embeddings can later index the evidence text for semantic retrieval, but they
 must not replace candidate identity, source URLs, scores, outcomes, or audit history.
 
+Import a research batch from CSV. `source_urls` uses semicolons and `evidence`
+uses double pipes between items:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/targets/import \
+  -H 'Content-Type: application/json' \
+  --data-binary @- <<'JSON'
+{"csv":"candidate_id,company_name,role,geography,target_profile,linkedin_activity,source_urls,evidence\nc-001,Example SMB,COO,Piedmont,COO at SMB,Posted about workflows,https://example.com/profile,Recent workflow post"}
+JSON
+```
+
+The import path only normalizes and validates data. It does not scrape or infer
+missing evidence.
+
 Score a validated candidate batch:
 
 ```bash

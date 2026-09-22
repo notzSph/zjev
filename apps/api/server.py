@@ -31,6 +31,7 @@ from packages.outreach import (  # noqa: E402
     rank_scores,
     ranked_csv,
     validate_target_batch,
+    import_target_csv,
 )
 from packages.integrations.typesafe import evaluate  # noqa: E402
 
@@ -58,6 +59,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             "/v1/outreach/target-plan", "/v1/outreach/targets/validate",
             "/v1/outreach/score",
             "/v1/outreach/rank",
+            "/v1/outreach/targets/import",
             "/v1/outreach/outcomes", "/v1/outreach/metrics",
         }:
             self._json(404, {"error": "not_found"})
@@ -100,6 +102,9 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     "ready_for_scoring": True,
                     "vector_indexed": False,
                 }
+            elif self.path == "/v1/outreach/targets/import":
+                candidates = import_target_csv(payload.get("csv"))
+                result = {"count": len(candidates), "candidates": candidates, "ready_for_scoring": True}
             elif self.path == "/v1/outreach/score":
                 candidates = validate_target_batch(payload.get("candidates"))
                 audit_store = OutreachAuditStore(
