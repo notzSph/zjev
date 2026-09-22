@@ -54,3 +54,11 @@ class CalibrationRequest(StrictModel):
 class GooglePlacesRequest(StrictModel):
     query: str
     max_results: int = 20
+
+
+class GooglePlacesScoreRequest(StrictModel):
+    query: str
+    offer: str
+    proof_assets: list[str]
+    max_results: int = 20
+    run_id: str | None = None

@@ -184,9 +184,23 @@ class OutreachAuditStore:
         if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("run_id must be a non-empty string")
         with self._connect() as connection:
+            cursor = connection.execute(
+                "UPDATE outreach_runs SET response_json = ? WHERE run_id = ?",
+                (json.dumps(response, sort_keys=True), run_id),
+            )
+            if cursor.rowcount == 0:
+                connection.execute(
+                    "INSERT INTO outreach_runs (run_id, response_json, created_at) VALUES (?, ?, ?)",
+                    (run_id, json.dumps(response, sort_keys=True), datetime.now(timezone.utc).isoformat()),
+                )
+
+    def create_run(self, run_id: str) -> None:
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id must be a non-empty string")
+        with self._connect() as connection:
             connection.execute(
-                "INSERT INTO outreach_runs (run_id, response_json, created_at) VALUES (?, ?, ?)",
-                (run_id, json.dumps(response, sort_keys=True), datetime.now(timezone.utc).isoformat()),
+                "INSERT OR IGNORE INTO outreach_runs (run_id, response_json, created_at) VALUES (?, ?, ?)",
+                (run_id, json.dumps({}), datetime.now(timezone.utc).isoformat()),
             )
 
 

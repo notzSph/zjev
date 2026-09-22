@@ -43,7 +43,22 @@ class SQLAlchemyAuditStore:
 
     def save_run(self, run_id: str, response: dict[str, Any]) -> None:
         with self.sessions.begin() as session:
-            session.add(OutreachRun(run_id=run_id, response=response, created_at=datetime.now(timezone.utc)))
+            run = session.get(OutreachRun, run_id)
+            if run is None:
+                session.add(OutreachRun(run_id=run_id, response=response, created_at=datetime.now(timezone.utc)))
+            else:
+                run.response = response
+
+    def create_run(self, run_id: str) -> None:
+        with self.sessions.begin() as session:
+            if session.get(OutreachRun, run_id) is None:
+                session.add(
+                    OutreachRun(
+                        run_id=run_id,
+                        response={},
+                        created_at=datetime.now(timezone.utc),
+                    )
+                )
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         with self.sessions() as session:

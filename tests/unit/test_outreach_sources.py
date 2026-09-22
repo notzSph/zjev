@@ -31,6 +31,13 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn("linkedin", source_status())
         self.assertEqual(source_status()["csv"]["mode"], "import")
 
+    def test_google_lead_has_business_scoring_evidence(self):
+        lead = search_google_places(
+            "key", "SMBs in Piedmont", opener=lambda *_args, **_kwargs: _Response()
+        )[0]
+        self.assertIn("Example SMB", lead["evidence"][0])
+        self.assertEqual(lead["role"], "unresolved buyer role")
+
 
 if __name__ == "__main__":
     unittest.main()

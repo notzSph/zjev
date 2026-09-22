@@ -24,6 +24,7 @@ from ...deps import AuthDependency, get_audit_store
 from ..schemas.outreach import (
     CalibrationRequest,
     GooglePlacesRequest,
+    GooglePlacesScoreRequest,
     OutcomeRequest,
     OutreachEvaluateRequest,
     RankRequest,
@@ -74,6 +75,36 @@ def google_places(payload: GooglePlacesRequest, _: AuthDependency) -> dict[str, 
     return {"count": len(leads), "leads": leads, "discovery_only": True, "requires_manual_enrichment": True}
 
 
+@router.post("/sources/google-places/score")
+def score_google_businesses(
+    payload: GooglePlacesScoreRequest, _: AuthDependency, store: AuditStore
+) -> dict[str, Any]:
+    leads = search_google_places(
+        os.environ.get("GOOGLE_MAPS_API_KEY"), payload.query, max_results=payload.max_results
+    )
+    run_id = payload.run_id or str(uuid.uuid4())
+    cached = store.get_run(run_id)
+    if cached is not None:
+        return {**cached, "idempotent_replay": True}
+    candidates = validate_target_batch(leads)
+    store.create_run(run_id)
+    scores = score_target_batch(
+        candidates, payload.offer, payload.proof_assets, evaluate, store, run_id
+    )
+    ranked = rank_scores(scores)
+    result = {
+        "run_id": run_id,
+        "count": len(ranked),
+        "scores": ranked,
+        "csv": ranked_csv(ranked),
+        "entity_type": "business",
+        "stops_at_account_scoring": True,
+        "idempotent_replay": False,
+    }
+    store.save_run(run_id, result)
+    return result
+
+
 @router.post("/score")
 def score(payload: ScoreBatchRequest, _: AuthDependency, store: AuditStore) -> dict[str, Any]:
     candidates = validate_target_batch(payload.candidates)
@@ -81,6 +112,7 @@ def score(payload: ScoreBatchRequest, _: AuthDependency, store: AuditStore) -> d
     cached = store.get_run(run_id)
     if cached is not None:
         return {**cached, "idempotent_replay": True}
+    store.create_run(run_id)
     scores = score_target_batch(
         candidates, payload.offer, payload.proof_assets, evaluate, store, run_id
     )

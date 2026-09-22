@@ -25,7 +25,8 @@ class APIDatabaseTests(unittest.TestCase):
                     "confidence_band": "proceed",
                 }
             }
-            audit_id = store.record(candidate, result)
+            store.create_run("run-1")
+            audit_id = store.record(candidate, result, "run-1")
             store.save_run("run-1", {"run_id": "run-1"})
             store.record_outcome(audit_id, "replied")
             self.assertEqual(store.get_run("run-1"), {"run_id": "run-1"})

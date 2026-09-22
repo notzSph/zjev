@@ -126,7 +126,10 @@ Source status is available at `POST /v1/outreach/sources/status`. Google Places
 company discovery is available at `POST /v1/outreach/sources/google-places` when
 `GOOGLE_MAPS_API_KEY` is configured. Its results are discovery-only leads and
 must be manually enriched with a verified person, role, activity, and evidence
-before scoring. zCRM is reserved for a configured CRM adapter.
+before person-level scoring. Account-level qualification is available at
+`POST /v1/outreach/sources/google-places/score`; it scores each business
+directly against the offer and stops at business scoring. It does not infer or
+require a specific person. zCRM is reserved for a configured CRM adapter.
 
 Score a validated candidate batch:
 
