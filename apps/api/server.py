@@ -34,6 +34,8 @@ from packages.outreach import (  # noqa: E402
     ranked_csv,
     validate_target_batch,
     import_target_csv,
+    search_google_places,
+    source_status,
 )
 from packages.integrations.typesafe import evaluate  # noqa: E402
 
@@ -77,6 +79,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             "/v1/outreach/score",
             "/v1/outreach/rank",
             "/v1/outreach/targets/import",
+            "/v1/outreach/sources/status", "/v1/outreach/sources/google-places",
             "/v1/outreach/outcomes", "/v1/outreach/metrics", "/v1/outreach/calibration",
         }:
             self._json(404, {"error": "not_found"})
@@ -122,6 +125,21 @@ class JevAPIHandler(BaseHTTPRequestHandler):
             elif self.path == "/v1/outreach/targets/import":
                 candidates = import_target_csv(payload.get("csv"))
                 result = {"count": len(candidates), "candidates": candidates, "ready_for_scoring": True}
+            elif self.path == "/v1/outreach/sources/status":
+                result = source_status()
+            elif self.path == "/v1/outreach/sources/google-places":
+                api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+                leads = search_google_places(
+                    api_key,
+                    payload.get("query"),
+                    max_results=payload.get("max_results", 20),
+                )
+                result = {
+                    "count": len(leads),
+                    "leads": leads,
+                    "discovery_only": True,
+                    "requires_manual_enrichment": True,
+                }
             elif self.path == "/v1/outreach/score":
                 candidates = validate_target_batch(payload.get("candidates"))
                 audit_store = OutreachAuditStore(

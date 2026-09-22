@@ -117,6 +117,13 @@ JSON
 The import path only normalizes and validates data. It does not scrape or infer
 missing evidence.
 
+Source status is available at `POST /v1/outreach/sources/status`. Google Places
+company discovery is available at `POST /v1/outreach/sources/google-places` when
+`GOOGLE_MAPS_API_KEY` is configured. Its results are discovery-only leads and
+must be manually enriched with a verified person, role, activity, and evidence
+before scoring. LinkedIn remains manual/import-only until approved API access is
+provided. zCRM is reserved for a configured CRM adapter.
+
 Score a validated candidate batch:
 
 ```bash

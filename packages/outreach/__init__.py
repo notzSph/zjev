@@ -6,6 +6,7 @@ from .selection import build_target_selection_plan
 from .targets import import_target_csv, validate_target_batch, validate_target_candidate
 from .audit import OUTCOME_STATES, OutreachAuditStore, score_target_batch
 from .ranking import rank_scores, ranked_csv
+from .sources import SourceNotConfigured, search_google_places, source_status
 
 __all__ = [
     "build_outreach_request",
@@ -16,6 +17,9 @@ __all__ = [
     "score_target_batch",
     "rank_scores",
     "ranked_csv",
+    "SourceNotConfigured",
+    "search_google_places",
+    "source_status",
     "validate_target_batch",
     "validate_target_candidate",
     "import_target_csv",
