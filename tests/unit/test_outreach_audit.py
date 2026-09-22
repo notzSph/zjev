@@ -34,7 +34,9 @@ class OutreachAuditTests(unittest.TestCase):
     def test_scores_and_records_batch(self):
         store = OutreachAuditStore(":memory:")
         result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store, "run-1")
-        self.assertEqual(result[0]["policy"]["recommended_action"], "draft_for_review")
+        self.assertEqual(result[0]["policy"]["recommended_action"], "research_more")
+        self.assertTrue(result[0]["policy"]["abstained"])
+        self.assertIn("missing_answer_citations", result[0]["policy"]["abstention_reasons"])
         self.assertEqual(result[0]["audit_id"], 1)
         self.assertTrue(result[0]["evidence_packet"]["citation_required"])
         self.assertEqual(result[0]["evidence_packet"]["citation_status"], "missing")
@@ -64,7 +66,7 @@ class OutreachAuditTests(unittest.TestCase):
         result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
         store.record_outcome(result[0]["audit_id"], "replied")
         report = store.calibration_report(minimum_labeled=2)
-        action = report["by_action"]["draft_for_review"]
+        action = report["by_action"]["research_more"]
         self.assertEqual(action["positive_rate"], 1.0)
         self.assertEqual(action["status"], "insufficient_data")
         self.assertFalse(report["threshold_tuning_allowed"])

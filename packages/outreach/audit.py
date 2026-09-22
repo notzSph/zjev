@@ -221,6 +221,7 @@ def score_target_batch(
             raise ValueError("evaluator must return an object")
         policy = derive_policy(raw)
         evidence_packet = build_evidence_packet(candidate, raw)
+        policy = apply_evidence_guardrail(policy, evidence_packet)
         result = {
             "candidate_id": candidate["candidate_id"],
             "result": raw,
@@ -276,6 +277,25 @@ def build_evidence_packet(candidate: dict[str, Any], result: dict[str, Any]) -> 
         "contradictions": contradictions,
         "contradiction_status": "review" if contradictions else "none_detected",
     }
+
+
+def apply_evidence_guardrail(policy: dict[str, Any], evidence_packet: dict[str, Any]) -> dict[str, Any]:
+    """Force unsupported or contradictory model output into a research state."""
+    guarded = dict(policy)
+    reasons = []
+    if evidence_packet["citation_status"] != "complete":
+        reasons.append("missing_answer_citations")
+    if evidence_packet["contradiction_status"] == "review":
+        reasons.append("contradictory_source_evidence")
+    if reasons:
+        guarded["model_recommended_action"] = policy.get("recommended_action")
+        guarded["recommended_action"] = "research_more"
+        guarded["abstained"] = True
+        guarded["abstention_reasons"] = reasons
+    else:
+        guarded["abstained"] = False
+        guarded["abstention_reasons"] = []
+    return guarded
 
 
 def _freshness_status(source_records: list[dict[str, Any]], max_age_days: int = 90) -> str:

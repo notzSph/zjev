@@ -9,6 +9,8 @@ def _score(candidate_id, action, fit):
         "evidence_packet": {
             "items": [{"id": f"{candidate_id}:e1"}],
             "freshness_status": "fresh",
+            "citation_status": "complete",
+            "contradiction_status": "none_detected",
         },
         "policy": {
             "recommended_action": action,
@@ -45,6 +47,12 @@ class OutreachRankingTests(unittest.TestCase):
         ranked = rank_scores([stale, empty])
         self.assertFalse(next(item for item in ranked if item["candidate_id"] == "stale")["eligible"])
         self.assertFalse(next(item for item in ranked if item["candidate_id"] == "empty")["eligible"])
+
+    def test_missing_citations_abstain(self):
+        score = _score("uncited", "draft_for_review", 4)
+        score["evidence_packet"]["citation_status"] = "missing"
+        ranked = rank_scores([score])
+        self.assertFalse(ranked[0]["eligible"])
 
 
 if __name__ == "__main__":
