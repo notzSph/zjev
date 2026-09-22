@@ -2,24 +2,18 @@ import os
 import unittest
 from unittest.mock import patch
 
-from apps.api.server import JevAPIHandler
+from apps.api.app.api.dependencies import require_auth
+from fastapi import HTTPException
 
 
 class APISecurityTests(unittest.TestCase):
     def test_production_requires_token(self):
         with patch.dict(os.environ, {"JEV_ENV": "production"}, clear=True):
-            handler = object.__new__(JevAPIHandler)
-            self.assertFalse(handler._authorized())
+            with self.assertRaises(HTTPException):
+                require_auth(None)
 
-    def test_bearer_token_is_constant_time_checked(self):
-        handler = object.__new__(JevAPIHandler)
-        handler.headers = {"Authorization": "Bearer secret"}
+    def test_bearer_token_is_checked(self):
         with patch.dict(os.environ, {"JEV_API_TOKEN": "secret"}, clear=True):
-            self.assertTrue(handler._authorized())
-        handler.headers = {"Authorization": "Bearer wrong"}
-        with patch.dict(os.environ, {"JEV_API_TOKEN": "secret"}, clear=True):
-            self.assertFalse(handler._authorized())
-
-
-if __name__ == "__main__":
-    unittest.main()
+            require_auth("Bearer secret")
+            with self.assertRaises(HTTPException):
+                require_auth("Bearer wrong")
