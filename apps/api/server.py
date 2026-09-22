@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -110,6 +111,13 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                 audit_store = OutreachAuditStore(
                     os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
                 )
+                run_id = payload.get("run_id") or str(uuid.uuid4())
+                if not isinstance(run_id, str) or not run_id.strip() or len(run_id) > 128:
+                    raise InputError("run_id must be a non-empty string of at most 128 characters")
+                cached = audit_store.get_run(run_id)
+                if cached is not None:
+                    self._json(200, {**cached, "idempotent_replay": True})
+                    return
                 scores = score_target_batch(
                     candidates,
                     payload.get("offer"),
@@ -118,7 +126,14 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     audit_store,
                 )
                 ranked = rank_scores(scores)
-                result = {"count": len(ranked), "scores": ranked, "csv": ranked_csv(ranked)}
+                result = {
+                    "run_id": run_id,
+                    "count": len(ranked),
+                    "scores": ranked,
+                    "csv": ranked_csv(ranked),
+                    "idempotent_replay": False,
+                }
+                audit_store.save_run(run_id, result)
             elif self.path == "/v1/outreach/rank":
                 ranked = rank_scores(payload.get("scores"))
                 result = {"count": len(ranked), "scores": ranked, "csv": ranked_csv(ranked)}

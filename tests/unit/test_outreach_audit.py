@@ -49,6 +49,14 @@ class OutreachAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             store.record_outcome(1, "maybe")
 
+    def test_stores_and_replays_run_response(self):
+        store = OutreachAuditStore(":memory:")
+        response = {"run_id": "run-1", "count": 1, "scores": []}
+        store.save_run("run-1", response)
+        self.assertEqual(store.get_run("run-1"), response)
+        with self.assertRaises(ValueError):
+            store.save_run("", response)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,6 +50,15 @@ class OutreachAuditStore:
                 """
             )
             connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS outreach_runs (
+                    run_id TEXT PRIMARY KEY,
+                    response_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_outreach_scores_candidate "
                 "ON outreach_scores(candidate_id, created_at)"
             )
@@ -122,6 +131,24 @@ class OutreachAuditStore:
                 )
             }
         return {"total_scores": total, "actions": actions, "outcomes": outcomes}
+
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id must be a non-empty string")
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT response_json FROM outreach_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+        return json.loads(row["response_json"]) if row else None
+
+    def save_run(self, run_id: str, response: dict[str, Any]) -> None:
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id must be a non-empty string")
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO outreach_runs (run_id, response_json, created_at) VALUES (?, ?, ?)",
+                (run_id, json.dumps(response, sort_keys=True), datetime.now(timezone.utc).isoformat()),
+            )
 
 
 def score_target_batch(
