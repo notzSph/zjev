@@ -1,6 +1,20 @@
 name: zjev
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-jevzoo}
+      POSTGRES_USER: ${POSTGRES_USER:-jevzoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jevzoo-dev-only}
+    volumes:
+      - jevzoo-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jevzoo} -d ${POSTGRES_DB:-jevzoo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   jev-api:
     env_file:
       - ../env/.env
@@ -8,10 +22,14 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile
     command: ["python", "apps/api/server.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
       JEV_API_HOST: 0.0.0.0
       JEV_API_PORT: 8080
+      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:5432/jevzoo}
     ports:
       - "${JEV_API_PORT:-8787}:8080"
 
@@ -25,3 +43,6 @@ services:
       TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
     stdin_open: true
     tty: true
+
+volumes:
+  jevzoo-postgres:

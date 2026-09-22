@@ -33,7 +33,7 @@ def _evaluation(_request):
 class OutreachAuditTests(unittest.TestCase):
     def test_scores_and_records_batch(self):
         store = OutreachAuditStore(":memory:")
-        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store, "run-1")
         self.assertEqual(result[0]["policy"]["recommended_action"], "draft_for_review")
         self.assertEqual(result[0]["audit_id"], 1)
         self.assertTrue(result[0]["evidence_packet"]["citation_required"])

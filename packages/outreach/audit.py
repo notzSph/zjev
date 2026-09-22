@@ -73,7 +73,9 @@ class OutreachAuditStore:
             if "outcome_at" not in columns:
                 connection.execute("ALTER TABLE outreach_scores ADD COLUMN outcome_at TEXT")
 
-    def record(self, candidate: dict[str, Any], result: dict[str, Any]) -> int:
+    def record(
+        self, candidate: dict[str, Any], result: dict[str, Any], run_id: str | None = None
+    ) -> int:
         policy = result.get("policy")
         if not isinstance(policy, dict):
             raise ValueError("result must contain a policy object")
@@ -194,6 +196,7 @@ def score_target_batch(
     proof_assets: list[str],
     evaluate_fn: Any,
     audit_store: OutreachAuditStore | None = None,
+    run_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Score a validated batch with one consistent request per candidate."""
     scored = []
@@ -219,7 +222,7 @@ def score_target_batch(
             },
         }
         if audit_store is not None:
-            result["audit_id"] = audit_store.record(candidate, result)
+            result["audit_id"] = audit_store.record(candidate, result, run_id)
         scored.append(result)
     return scored
 

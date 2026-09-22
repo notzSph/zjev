@@ -38,8 +38,17 @@ from packages.outreach import (  # noqa: E402
     source_status,
 )
 from packages.integrations.typesafe import evaluate  # noqa: E402
+from apps.api.config import APISettings  # noqa: E402
+from apps.api.database import SQLAlchemyAuditStore  # noqa: E402
 
 MAX_BODY_BYTES = 1_000_000
+
+
+def get_audit_store() -> OutreachAuditStore | SQLAlchemyAuditStore:
+    settings = APISettings.from_env()
+    if settings.database_url:
+        return SQLAlchemyAuditStore(settings.database_url)
+    return OutreachAuditStore(settings.audit_db_path)
 
 
 class JevAPIHandler(BaseHTTPRequestHandler):
@@ -142,9 +151,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                 }
             elif self.path == "/v1/outreach/score":
                 candidates = validate_target_batch(payload.get("candidates"))
-                audit_store = OutreachAuditStore(
-                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
-                )
+                audit_store = get_audit_store()
                 run_id = payload.get("run_id") or str(uuid.uuid4())
                 if not isinstance(run_id, str) or not run_id.strip() or len(run_id) > 128:
                     raise InputError("run_id must be a non-empty string of at most 128 characters")
@@ -158,6 +165,7 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                     payload.get("proof_assets"),
                     evaluate,
                     audit_store,
+                    run_id,
                 )
                 ranked = rank_scores(scores)
                 result = {
@@ -172,22 +180,16 @@ class JevAPIHandler(BaseHTTPRequestHandler):
                 ranked = rank_scores(payload.get("scores"))
                 result = {"count": len(ranked), "scores": ranked, "csv": ranked_csv(ranked)}
             elif self.path == "/v1/outreach/outcomes":
-                audit_store = OutreachAuditStore(
-                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
-                )
+                audit_store = get_audit_store()
                 audit_store.record_outcome(
                     payload.get("audit_id"), payload.get("outcome"), payload.get("note")
                 )
                 result = {"updated": True}
             elif self.path == "/v1/outreach/metrics":
-                audit_store = OutreachAuditStore(
-                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
-                )
+                audit_store = get_audit_store()
                 result = audit_store.metrics()
             elif self.path == "/v1/outreach/calibration":
-                audit_store = OutreachAuditStore(
-                    os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3")
-                )
+                audit_store = get_audit_store()
                 result = audit_store.calibration_report(payload.get("minimum_labeled", 30))
             else:
                 result = evaluate(payload)
@@ -202,12 +204,10 @@ class JevAPIHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    host = os.environ.get("JEV_API_HOST", "0.0.0.0")
-    port = int(os.environ.get("JEV_API_PORT", "8080"))
-    if os.environ.get("JEV_ENV", "development").lower() == "production" and not os.environ.get("JEV_API_TOKEN"):
-        raise RuntimeError("JEV_API_TOKEN is required in production")
-    server = ThreadingHTTPServer((host, port), JevAPIHandler)
-    print(f"Jev API listening on {host}:{port}", flush=True)
+    settings = APISettings.from_env()
+    settings.validate()
+    server = ThreadingHTTPServer((settings.host, settings.port), JevAPIHandler)
+    print(f"Jev API listening on {settings.host}:{settings.port}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
