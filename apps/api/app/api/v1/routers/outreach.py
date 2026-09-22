@@ -19,6 +19,8 @@ from packages.outreach import (
     search_google_places,
     source_status,
     validate_target_batch,
+    ZCRMClient,
+    export_scores_to_zcrm,
 )
 
 from ...deps import AuthDependency, get_audit_store
@@ -34,6 +36,7 @@ from ..schemas.outreach import (
     TargetBatchRequest,
     TargetImportRequest,
     TargetPlanRequest,
+    ZCRMExportRequest,
 )
 
 router = APIRouter(prefix="/v1/outreach", tags=["outreach"])
@@ -89,6 +92,17 @@ def import_targets(payload: TargetImportRequest, _: AuthDependency) -> dict[str,
 @router.post("/sources/status")
 def sources(_: AuthDependency) -> dict[str, Any]:
     return source_status()
+
+
+@router.post("/zcrm/export")
+def export_zcrm(payload: ZCRMExportRequest, _: AuthDependency) -> dict[str, Any]:
+    client = ZCRMClient.from_env()
+    return export_scores_to_zcrm(
+        payload.scores,
+        client,
+        include_ineligible=payload.include_ineligible,
+        dry_run=payload.dry_run,
+    )
 
 
 @router.post("/sources/google-places")

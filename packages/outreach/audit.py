@@ -318,6 +318,7 @@ def score_target_batch(
         policy = apply_evidence_guardrail(policy, evidence_packet)
         result = {
             "candidate_id": candidate["candidate_id"],
+            "candidate": candidate,
             "result": raw,
             "policy": policy,
             "evidence_packet": evidence_packet,

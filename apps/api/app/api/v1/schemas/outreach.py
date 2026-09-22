@@ -66,3 +66,9 @@ class GooglePlacesScoreRequest(StrictModel):
     proof_assets: list[str]
     max_results: int = 20
     run_id: str | None = None
+
+
+class ZCRMExportRequest(StrictModel):
+    scores: list[dict[str, Any]]
+    include_ineligible: bool = False
+    dry_run: bool = False

@@ -29,7 +29,11 @@ def source_status() -> dict[str, dict[str, Any]]:
             "requires_credentials": True,
         },
         "zcrm": {
-            "available": bool(os.environ.get("ZCRM_API_URL") and os.environ.get("ZCRM_API_TOKEN")),
+            "available": bool(
+                os.environ.get("ZCRM_API_URL")
+                and os.environ.get("ZCRM_API_TOKEN")
+                and os.environ.get("ZCRM_BUSINESS_ID")
+            ),
             "mode": "crm_import",
             "requires_credentials": True,
         },

@@ -8,6 +8,7 @@ from .audit import OUTCOME_STATES, OutreachAuditStore, score_target_batch
 from .ranking import rank_scores, ranked_csv
 from .sources import SourceNotConfigured, search_google_places, source_status
 from .jobs import process_job
+from .zcrm import ZCRMClient, ZCRMNotConfigured, export_scores_to_zcrm, score_to_zcrm_lead
 
 __all__ = [
     "build_outreach_request",
@@ -25,4 +26,8 @@ __all__ = [
     "validate_target_candidate",
     "import_target_csv",
     "process_job",
+    "ZCRMClient",
+    "ZCRMNotConfigured",
+    "export_scores_to_zcrm",
+    "score_to_zcrm_lead",
 ]
