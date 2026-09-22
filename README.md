@@ -27,6 +27,15 @@ export JEV_API_KEY='...'
 python3 apps/cli/main.py < examples/basic_request.json
 ```
 
+For the API, set `JEV_API_TOKEN` and send `Authorization: Bearer <token>`.
+Production mode (`JEV_ENV=production`) refuses to start without that token.
+Every API response includes a request ID for tracing.
+
+Production persistence uses SQLAlchemy with Postgres. Set `JEV_DATABASE_URL`.
+Compose includes a Postgres 16 service and waits for its healthcheck before
+starting the API. Alembic owns schema changes and runs before the API starts.
+SQLite remains available for local development and tests only.
+
 Get the key from the TypeSafe dashboard. Do not put it in source, prompts,
 Discord, or the request body. `TYPESAFE_API_KEY` is also accepted for
 upstream-compatible deployments.
@@ -41,7 +50,7 @@ keeping local verification dependency-free.
 ## Docker Compose
 
 Compose wraps the existing CLI and the first real API surface. The API has one
-health endpoint and two evaluation endpoints. No background workers are added.
+health endpoint and three evaluation endpoints. No background workers are added.
 
 ```bash
 export JEV_API_KEY='...'
@@ -67,6 +76,134 @@ curl -X POST http://localhost:8787/v1/job_fit \
   -H 'Content-Type: application/json' \
   --data '{"cv":"...","job_description":"..."}'
 ```
+
+Prepare an outreach brief from supplied LinkedIn context and proof assets:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/evaluate \
+  -H 'Content-Type: application/json' \
+  --data '{"target_profile":"...","linkedin_activity":"...","prior_interactions":"...","offer":"...","proof_assets":["..."]}'
+```
+
+Build a bounded target-selection plan before researching candidates:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/target-plan \
+  -H 'Content-Type: application/json' \
+  --data '{"offer":"workflow automation","geography":"Piedmont, Italy"}'
+```
+
+The target plan creates search terms, qualification requirements, exclusions,
+and a manual research workflow. It does not scrape, contact, or auto-send.
+
+Validate a manually collected candidate batch before scoring:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/targets/validate \
+  -H 'Content-Type: application/json' \
+  --data '{"candidates":[{"candidate_id":"c-001","company_name":"Example SMB","role":"COO","geography":"Piedmont, Italy","target_profile":"...","linkedin_activity":"...","source_urls":["https://example.com/profile"]}]}'
+```
+
+The structured candidate record is the foundation for a relational audit store.
+Embeddings can later index the evidence text for semantic retrieval, but they
+must not replace candidate identity, source URLs, scores, outcomes, or audit history.
+
+Import a research batch from CSV. `source_urls` uses semicolons and `evidence`
+uses double pipes between items:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/targets/import \
+  -H 'Content-Type: application/json' \
+  --data-binary @- <<'JSON'
+{"csv":"candidate_id,company_name,role,geography,target_profile,linkedin_activity,source_urls,evidence\nc-001,Example SMB,COO,Piedmont,COO at SMB,Posted about workflows,https://example.com/profile,Recent workflow post"}
+JSON
+```
+
+The import path only normalizes and validates data. It does not scrape or infer
+missing evidence.
+
+Every score now includes an evidence packet with stable item IDs, per-answer
+citation mappings, uncited-answer flags, source freshness, and contradiction
+flags. Model answers may cite supplied items with `evidence_ids`; invalid or
+missing references remain visible for review instead of being silently treated
+as proof.
+
+Source status is available at `POST /v1/outreach/sources/status`. Google Places
+company discovery is available at `POST /v1/outreach/sources/google-places` when
+`GOOGLE_MAPS_API_KEY` is configured. Its results are discovery-only leads and
+must be manually enriched with a verified person, role, activity, and evidence
+before person-level scoring. Account-level qualification is available at
+`POST /v1/outreach/sources/google-places/score`; it scores each business
+directly against the offer and stops at business scoring. It does not infer or
+require a specific person. zCRM is reserved for a configured CRM adapter.
+
+Score a validated candidate batch:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/score \
+  -H 'Content-Type: application/json' \
+  --data '{"offer":"workflow automation","proof_assets":["case study"],"candidates":[{"candidate_id":"c-001","company_name":"Example SMB","role":"COO","geography":"Piedmont, Italy","target_profile":"...","linkedin_activity":"...","source_urls":["https://example.com/profile"]}]}'
+```
+
+Set `JEV_OUTREACH_DB` to configure the SQLite audit path. The scoring endpoint
+stores each raw evaluation and derived policy with the calibration version.
+The response also includes a deterministic rank score, eligibility flag, evidence
+packet, and CSV shortlist export. Ranking never overrides the safety policy.
+Pass a stable `run_id` to make client retries idempotent. A repeated run ID
+returns the stored response without rescoring or creating duplicate audit rows.
+Source records may include timezone-aware `captured_at` timestamps. Evidence older
+than 90 days, or candidates with no evidence items, are excluded from the eligible
+shortlist and require fresh research.
+
+For queued scoring, use `POST /v1/outreach/score/jobs`. It returns a job ID
+immediately, persists attempts and status, and processes the job in the API
+background worker. Failed jobs retry with exponential backoff and move to
+`dead_letter` after `max_attempts`. Poll `GET /v1/outreach/score/jobs/{job_id}`
+for the result.
+
+Production Compose also includes a separate `jev-worker` service. It claims
+queued jobs directly from Postgres, so API restarts do not own or lose queued
+work. Outbound zCRM requests can use the process-local limiter to fail fast and
+let the durable job retry policy handle backoff.
+
+Set `JEV_OUTREACH_RETENTION_DAYS` to control cleanup of old scores, runs, and
+terminal jobs. Set `JEV_ALLOWED_SOURCE_TYPES` to a comma-separated allowlist,
+such as `google_places,csv,zcrm,manual`; unapproved source types are rejected
+before scoring. The worker runs retention cleanup on startup.
+
+Calibration is exposed at `POST /v1/outreach/calibration`, drift metrics at
+`POST /v1/outreach/drift`, and the combined dashboard payload at
+`POST /v1/outreach/dashboard`. Human review uses
+`POST /v1/outreach/approvals/pending` and `POST /v1/outreach/approvals` with
+`approved`, `rejected`, or `needs_changes` decisions.
+
+Record what happened after review/contact:
+
+```bash
+curl -X POST http://localhost:8787/v1/outreach/outcomes \
+  -H 'Content-Type: application/json' \
+  --data '{"audit_id":1,"outcome":"replied","note":"Asked for more context"}'
+```
+
+Read aggregate routing and outcome metrics at `POST /v1/outreach/metrics`.
+Supported outcomes include `replied`, `qualified`, `meeting_booked`,
+`converted`, `not_interested`, `disqualified`, and `no_response`.
+
+Read the calibration report at `POST /v1/outreach/calibration`. It reports
+outcome rates by routing action but refuses to mark threshold tuning ready until
+the minimum labelled sample is reached.
+
+The outreach evaluator returns a typed angle, proof asset, personalization strength,
+likely objection, CTA type, readiness, and claim-risk signals. Its policy always
+requires human approval and sets `auto_send` to false. It produces a structured
+brief for drafting, not an autonomous message or send action.
+
+The evaluator includes the current z-calibration: Piedmont and Italy, SMBs with
+concrete operational or digital workflow problems, CEO/CTO/COO/digital and
+innovation leads, custom software/AI automation/data pipeline offer lanes, and
+the manual connection-to-call sequence. The calibration is versioned and visible
+in the request state. It is a working operating model, not historical conversion
+data, so outcome-based threshold tuning remains a later step.
 
 The job evaluator returns independent typed dimensions for requirements,
 technical work, architecture, leadership, delivery, governance, seniority,

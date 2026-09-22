@@ -1,0 +1,98 @@
+import unittest
+
+from packages.outreach import OutreachAuditStore, process_job, score_target_batch, validate_target_batch
+
+
+def _candidate():
+    return validate_target_batch([{
+        "candidate_id": "c-1",
+        "company_name": "Example SMB",
+        "role": "COO",
+        "geography": "Piedmont, Italy",
+        "target_profile": "COO at a logistics SMB",
+        "linkedin_activity": "Posted about manual quoting",
+        "source_urls": ["https://example.com/profile"],
+    }])[0]
+
+
+def _evaluation(_request):
+    return {"answers": {
+        "icp_fit": {"score": 4, "confidence": 0.95},
+        "buyer_relevance": {"score": 4, "confidence": 0.95},
+        "buying_signal": {"score": 4, "confidence": 0.95},
+        "account_safety_risk": {"score": 0, "confidence": 0.95},
+        "personalization_evidence": {"score": 4, "confidence": 0.95},
+        "generic_risk": {"score": 1, "confidence": 0.95},
+        "outreach_readiness": {"noul": True, "confidence": 0.95},
+        "unsupported_claim_risk": {"noul": False},
+        "best_outreach_angle": {"choice": "relevant_problem"},
+        "cta_type": {"choice": "ask_context"},
+    }}
+
+
+class OutreachAuditTests(unittest.TestCase):
+    def test_scores_and_records_batch(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store, "run-1")
+        self.assertEqual(result[0]["policy"]["recommended_action"], "research_more")
+        self.assertTrue(result[0]["policy"]["abstained"])
+        self.assertIn("missing_answer_citations", result[0]["policy"]["abstention_reasons"])
+        self.assertEqual(result[0]["audit_id"], 1)
+        self.assertTrue(result[0]["evidence_packet"]["citation_required"])
+        self.assertEqual(result[0]["evidence_packet"]["citation_status"], "missing")
+        self.assertIn("icp_fit", result[0]["evidence_packet"]["uncited_answers"])
+
+    def test_records_outcome_and_metrics(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        store.record_outcome(result[0]["audit_id"], "replied", "Asked for more context")
+        self.assertEqual(store.metrics()["outcomes"], {"replied": 1})
+
+    def test_rejects_unknown_outcome(self):
+        store = OutreachAuditStore(":memory:")
+        with self.assertRaises(ValueError):
+            store.record_outcome(1, "maybe")
+
+    def test_stores_and_replays_run_response(self):
+        store = OutreachAuditStore(":memory:")
+        response = {"run_id": "run-1", "count": 1, "scores": []}
+        store.save_run("run-1", response)
+        self.assertEqual(store.get_run("run-1"), response)
+        with self.assertRaises(ValueError):
+            store.save_run("", response)
+
+    def test_calibration_report_refuses_small_samples(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        store.record_outcome(result[0]["audit_id"], "replied")
+        report = store.calibration_report(minimum_labeled=2)
+        action = report["by_action"]["research_more"]
+        self.assertEqual(action["positive_rate"], 1.0)
+        self.assertEqual(action["status"], "insufficient_data")
+        self.assertFalse(report["threshold_tuning_allowed"])
+
+    def test_job_queue_retries_and_completes(self):
+        store = OutreachAuditStore(":memory:")
+        store.enqueue_job("job-1", {"run_id": "run-1"}, max_attempts=2)
+        failed = process_job(store, "job-1", lambda _payload: (_ for _ in ()).throw(RuntimeError("boom")))
+        self.assertEqual(failed["status"], "queued")
+        self.assertEqual(failed["attempts"], 1)
+
+        store._connect().execute(
+            "UPDATE outreach_jobs SET available_at = ? WHERE job_id = ?",
+            ("1970-01-01T00:00:00+00:00", "job-1"),
+        )
+        completed = process_job(store, "job-1", lambda _payload: {"ok": True})
+        self.assertEqual(completed["status"], "succeeded")
+        self.assertEqual(completed["result"], {"ok": True})
+
+    def test_human_approval_queue(self):
+        store = OutreachAuditStore(":memory:")
+        result = score_target_batch([_candidate()], "workflow automation", ["case study"], _evaluation, store)
+        self.assertEqual(len(store.pending_approvals()), 1)
+        store.approve_score(result[0]["audit_id"], "approved", "Reviewed evidence")
+        self.assertEqual(store.pending_approvals(), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

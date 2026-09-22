@@ -1,0 +1,43 @@
+import json
+import unittest
+
+from packages.outreach import search_google_places, source_status
+
+
+class _Response:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def read(self):
+        return json.dumps({"places": [{
+            "id": "ChIJ1", "displayName": {"text": "Example SMB"},
+            "formattedAddress": "Piedmont, Italy",
+            "googleMapsUri": "https://maps.google.com/?cid=1",
+            "types": ["establishment"],
+        }]}).encode()
+
+
+class SourceTests(unittest.TestCase):
+    def test_google_places_returns_discovery_only_leads(self):
+        leads = search_google_places("key", "SMBs in Piedmont", opener=lambda *_args, **_kwargs: _Response())
+        self.assertEqual(leads[0]["company_name"], "Example SMB")
+        self.assertTrue(leads[0]["discovery_only"])
+        self.assertEqual(leads[0]["source_records"][0]["source_type"], "google_places")
+
+    def test_source_status_exposes_business_sources(self):
+        self.assertNotIn("linkedin", source_status())
+        self.assertEqual(source_status()["csv"]["mode"], "import")
+
+    def test_google_lead_has_business_scoring_evidence(self):
+        lead = search_google_places(
+            "key", "SMBs in Piedmont", opener=lambda *_args, **_kwargs: _Response()
+        )[0]
+        self.assertIn("Example SMB", lead["evidence"][0])
+        self.assertEqual(lead["role"], "unresolved buyer role")
+
+
+if __name__ == "__main__":
+    unittest.main()

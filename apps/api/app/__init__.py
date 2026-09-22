@@ -1,0 +1,1 @@
+"""Jevzoo API application package."""
