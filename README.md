@@ -52,6 +52,15 @@ keeping local verification dependency-free.
 Compose wraps the existing CLI and the first real API surface. The API has one
 health endpoint and three evaluation endpoints. No background workers are added.
 
+Production host allocations are API `127.0.0.1:8300` and Postgres
+`127.0.0.1:25433`, mapped to container ports `8300` and `25433`. Override them
+with `JEV_API_HOST_PORT` and `JEV_DB_HOST_PORT`. Internal Compose callers use
+the service names and container ports.
+
+The API also joins the external `jayzoo_default` Docker network for internal
+agent access at `http://jev-api:8300`. Postgres remains on jevzoo's private
+network and is not exposed to the agent network.
+
 ```bash
 export JEV_API_KEY='...'
 docker compose -f infra/docker/compose.yml build
@@ -63,8 +72,8 @@ Run the API:
 
 ```bash
 docker compose -f infra/docker/compose.yml up jev-api
-curl http://localhost:8787/healthz
-curl -X POST http://localhost:8787/v1/evaluate \
+curl http://localhost:8300/healthz
+curl -X POST http://localhost:8300/v1/evaluate \
   -H 'Content-Type: application/json' \
   --data @examples/basic_request.json
 ```
@@ -72,7 +81,7 @@ curl -X POST http://localhost:8787/v1/evaluate \
 Run the job-fit evaluator against a CV and job description:
 
 ```bash
-curl -X POST http://localhost:8787/v1/job_fit \
+curl -X POST http://localhost:8300/v1/job_fit \
   -H 'Content-Type: application/json' \
   --data '{"cv":"...","job_description":"..."}'
 ```
@@ -80,7 +89,7 @@ curl -X POST http://localhost:8787/v1/job_fit \
 Prepare an outreach brief from supplied LinkedIn context and proof assets:
 
 ```bash
-curl -X POST http://localhost:8787/v1/outreach/evaluate \
+curl -X POST http://localhost:8300/v1/outreach/evaluate \
   -H 'Content-Type: application/json' \
   --data '{"target_profile":"...","linkedin_activity":"...","prior_interactions":"...","offer":"...","proof_assets":["..."]}'
 ```
@@ -88,7 +97,7 @@ curl -X POST http://localhost:8787/v1/outreach/evaluate \
 Build a bounded target-selection plan before researching candidates:
 
 ```bash
-curl -X POST http://localhost:8787/v1/outreach/target-plan \
+curl -X POST http://localhost:8300/v1/outreach/target-plan \
   -H 'Content-Type: application/json' \
   --data '{"offer":"workflow automation","geography":"Piedmont, Italy"}'
 ```
@@ -99,7 +108,7 @@ and a manual research workflow. It does not scrape, contact, or auto-send.
 Validate a manually collected candidate batch before scoring:
 
 ```bash
-curl -X POST http://localhost:8787/v1/outreach/targets/validate \
+curl -X POST http://localhost:8300/v1/outreach/targets/validate \
   -H 'Content-Type: application/json' \
   --data '{"candidates":[{"candidate_id":"c-001","company_name":"Example SMB","role":"COO","geography":"Piedmont, Italy","target_profile":"...","linkedin_activity":"...","source_urls":["https://example.com/profile"]}]}'
 ```
@@ -112,7 +121,7 @@ Import a research batch from CSV. `source_urls` uses semicolons and `evidence`
 uses double pipes between items:
 
 ```bash
-curl -X POST http://localhost:8787/v1/outreach/targets/import \
+curl -X POST http://localhost:8300/v1/outreach/targets/import \
   -H 'Content-Type: application/json' \
   --data-binary @- <<'JSON'
 {"csv":"candidate_id,company_name,role,geography,target_profile,linkedin_activity,source_urls,evidence\nc-001,Example SMB,COO,Piedmont,COO at SMB,Posted about workflows,https://example.com/profile,Recent workflow post"}
@@ -140,7 +149,7 @@ require a specific person. zCRM is reserved for a configured CRM adapter.
 Score a validated candidate batch:
 
 ```bash
-curl -X POST http://localhost:8787/v1/outreach/score \
+curl -X POST http://localhost:8300/v1/outreach/score \
   -H 'Content-Type: application/json' \
   --data '{"offer":"workflow automation","proof_assets":["case study"],"candidates":[{"candidate_id":"c-001","company_name":"Example SMB","role":"COO","geography":"Piedmont, Italy","target_profile":"...","linkedin_activity":"...","source_urls":["https://example.com/profile"]}]}'
 ```
@@ -180,7 +189,7 @@ Calibration is exposed at `POST /v1/outreach/calibration`, drift metrics at
 Record what happened after review/contact:
 
 ```bash
-curl -X POST http://localhost:8787/v1/outreach/outcomes \
+curl -X POST http://localhost:8300/v1/outreach/outcomes \
   -H 'Content-Type: application/json' \
   --data '{"audit_id":1,"outcome":"replied","note":"Asked for more context"}'
 ```

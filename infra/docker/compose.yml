@@ -3,6 +3,11 @@ name: zjev
 services:
   postgres:
     image: postgres:16-alpine
+    # jevzoo internal and production database port: 25433.
+    # Loopback-only binding keeps the database off the public interface.
+    ports:
+      - "127.0.0.1:${JEV_DB_HOST_PORT:-25433}:25433"
+    command: ["postgres", "-p", "25433"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-jevzoo}
       POSTGRES_USER: ${POSTGRES_USER:-jevzoo}
@@ -10,7 +15,7 @@ services:
     volumes:
       - jevzoo-postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jevzoo} -d ${POSTGRES_DB:-jevzoo}"]
+      test: ["CMD-SHELL", "pg_isready -p 25433 -U ${POSTGRES_USER:-jevzoo} -d ${POSTGRES_DB:-jevzoo}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,7 +26,7 @@ services:
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
-    command: ["sh", "-c", "PYTHONPATH=.:apps/api alembic -c apps/api/alembic.ini upgrade head && PYTHONPATH=.:apps/api uvicorn --app-dir apps/api app.main:app --host 0.0.0.0 --port 8080"]
+    command: ["sh", "-c", "PYTHONPATH=.:apps/api alembic -c apps/api/alembic.ini upgrade head && PYTHONPATH=.:apps/api uvicorn --app-dir apps/api app.main:app --host 0.0.0.0 --port 8300"]
 
     depends_on:
       postgres:
@@ -29,10 +34,14 @@ services:
     environment:
       TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
       JEV_API_HOST: 0.0.0.0
-      JEV_API_PORT: 8080
-      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:5432/jevzoo}
+      JEV_API_PORT: 8300
+      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:25433/jevzoo}
     ports:
-      - "${JEV_API_PORT:-8787}:8080"
+      # jevzoo internal and production API port: 8300.
+      - "127.0.0.1:${JEV_API_HOST_PORT:-8300}:8300"
+    networks:
+      - default
+      - agent
 
   jev-worker:
     env_file:
@@ -47,7 +56,7 @@ services:
         condition: service_healthy
     environment:
       TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
-      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:5432/jevzoo}
+      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:25433/jevzoo}
 
   jev-cli:
     env_file:
@@ -62,3 +71,8 @@ services:
 
 volumes:
   jevzoo-postgres:
+
+networks:
+  agent:
+    name: jayzoo_default
+    external: true
