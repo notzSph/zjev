@@ -1,1 +1,1 @@
-"""Jevzoo API application package."""
+"""zJev API application package."""

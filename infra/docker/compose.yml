@@ -3,19 +3,19 @@ name: zjev
 services:
   postgres:
     image: postgres:16-alpine
-    # jevzoo internal and production database port: 25433.
+    # zjev internal and production database port: 25433.
     # Loopback-only binding keeps the database off the public interface.
     ports:
       - "127.0.0.1:${JEV_DB_HOST_PORT:-25433}:25433"
     command: ["postgres", "-p", "25433"]
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-jevzoo}
-      POSTGRES_USER: ${POSTGRES_USER:-jevzoo}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jevzoo-dev-only}
+      POSTGRES_DB: ${POSTGRES_DB:-zjev}
+      POSTGRES_USER: ${POSTGRES_USER:-zjev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zjev-dev-only}
     volumes:
-      - jevzoo-postgres:/var/lib/postgresql/data
+      - zjev-postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -p 25433 -U ${POSTGRES_USER:-jevzoo} -d ${POSTGRES_DB:-jevzoo}"]
+      test: ["CMD-SHELL", "pg_isready -p 25433 -U ${POSTGRES_USER:-zjev} -d ${POSTGRES_DB:-zjev}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -35,9 +35,9 @@ services:
       TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
       JEV_API_HOST: 0.0.0.0
       JEV_API_PORT: 8300
-      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:25433/jevzoo}
+      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://zjev:zjev-dev-only@postgres:25433/zjev}
     ports:
-      # jevzoo internal and production API port: 8300.
+      # zjev internal and production API port: 8300.
       - "127.0.0.1:${JEV_API_HOST_PORT:-8300}:8300"
     networks:
       - default
@@ -56,7 +56,7 @@ services:
         condition: service_healthy
     environment:
       TYPESAFE_API_BASE_URL: ${TYPESAFE_API_BASE_URL:-https://api.typesafe.ai}
-      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://jevzoo:jevzoo-dev-only@postgres:25433/jevzoo}
+      JEV_DATABASE_URL: ${JEV_DATABASE_URL:-postgresql+psycopg://zjev:zjev-dev-only@postgres:25433/zjev}
 
   jev-cli:
     env_file:
@@ -70,7 +70,7 @@ services:
     tty: true
 
 volumes:
-  jevzoo-postgres:
+  zjev-postgres:
 
 networks:
   agent:

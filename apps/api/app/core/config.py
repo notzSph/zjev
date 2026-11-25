@@ -25,7 +25,7 @@ class APISettings:
             port=int(os.environ.get("JEV_API_PORT", "8300")),
             api_token=os.environ.get("JEV_API_TOKEN"),
             database_url=os.environ.get("JEV_DATABASE_URL"),
-            audit_db_path=os.environ.get("JEV_OUTREACH_DB", "/tmp/jevzoo-outreach.sqlite3"),
+            audit_db_path=os.environ.get("JEV_OUTREACH_DB", "/tmp/zjev-outreach.sqlite3"),
             google_maps_api_key=os.environ.get("GOOGLE_MAPS_API_KEY"),
             retention_days=int(os.environ.get("JEV_OUTREACH_RETENTION_DAYS", "365")),
         )

@@ -81,8 +81,8 @@ def score_to_zcrm_lead(score: dict[str, Any]) -> dict[str, Any]:
     return {
         "company": company.strip(),
         "contact_name": None,
-        "source": "jevzoo",
-        "tags": ["jevzoo", "outreach", "business_target"],
+        "source": "zjev",
+        "tags": ["zjev", "outreach", "business_target"],
         "external_ref": candidate_id.strip(),
         "status": "target",
         "description": json.dumps(

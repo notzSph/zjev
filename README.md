@@ -1,10 +1,10 @@
 # zjev
 
 [![Version](https://img.shields.io/badge/version-0.0.1--alpha-orange.svg)](https://semver.org/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/docker-supported-2496ED.svg)](https://www.docker.com/)
-[![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](https://en.wikipedia.org/wiki/Software_release_life_cycle)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+![Build](https://img.shields.io/badge/Build-passing-brightgreen)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-supported-2496ED.svg)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 CI runs on pushes and pull requests. Tagged releases build and publish the
 Docker image to GitHub Container Registry. Host deployment remains an explicit
@@ -58,7 +58,7 @@ with `JEV_API_HOST_PORT` and `JEV_DB_HOST_PORT`. Internal Compose callers use
 the service names and container ports.
 
 The API also joins the external `jayzoo_default` Docker network for internal
-agent access at `http://jev-api:8300`. Postgres remains on jevzoo's private
+agent access at `http://jev-api:8300`. Postgres remains on zjev's private
 network and is not exposed to the agent network.
 
 ```bash
